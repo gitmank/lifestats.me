@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlmodel import SQLModel
 
@@ -11,6 +11,7 @@ class UserCreate(UserBase):
 class UserSignup(UserBase):
     # Token (plaintext UUID4) returned on signup
     token: str
+    hint: str = "Use this token in the Authorization header as 'Bearer {token}'"
 
 class UserRead(UserBase):
     id: int
@@ -32,19 +33,21 @@ class MetricEntryCreate(MetricEntryBase):
 class MetricEntryRead(MetricEntryBase):
     id: int
     user_id: int
+    hint: str = "Use GET /api/metrics to view your aggregated metrics"
     
 class APIKeyOut(SQLModel):
     """
     Response model for API key creation.
     """
     token: str
+    hint: str = "Use this token in the Authorization header as 'Bearer {token}'"
 
 class APIKeyDelete(SQLModel):
     """
     Request model for deleting an API key.
     """
     token: str
-
+ 
 
 class AggregatedMetrics(SQLModel):
     """
@@ -52,7 +55,9 @@ class AggregatedMetrics(SQLModel):
     for metrics without entries.
     """
     daily: Dict[str, Optional[float]]
-    weekly: Dict[str, Optional[float]]
+    # Weekly aggregation includes average per day and daily totals
+    weekly: Dict[str, Any]
     monthly: Dict[str, Optional[float]]
     quarterly: Dict[str, Optional[float]]
     yearly: Dict[str, Optional[float]]
+    hint: str = "Use POST /api/metrics to add new measurement entries"
