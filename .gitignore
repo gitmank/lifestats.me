@@ -58,9 +58,6 @@ compiled/
 # Github workflows artifacts
 .github/workflows/*.log
 
-# Backend config
-backend/app/metrics_config.yaml
-
 # Frontend build
 frontend/dist/
 PROJECT_PLAN.md
