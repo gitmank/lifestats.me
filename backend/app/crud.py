@@ -1,7 +1,8 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Session, select
-from .models import User, MetricEntry, APIKey
+from .models import User, MetricEntry, APIKey, Goal
+from .config import config
 import logging
 
 def create_user(session: Session, username: str) -> User:
@@ -86,3 +87,78 @@ def get_user_metrics(
         statement = statement.where(MetricEntry.timestamp <= end_date)
     statement = statement.order_by(MetricEntry.timestamp)
     return session.exec(statement).all()
+ 
+def create_goal(
+    session: Session,
+    user_id: int,
+    metric_key: str,
+    target_value: float,
+) -> Goal:
+    """
+    Create a new goal for the given user and metric.
+    """
+    logging.info(f"create_goal called for user_id={user_id}, metric_key={metric_key}, target_value={target_value}")
+    goal = Goal(
+        user_id=user_id,
+        metric_key=metric_key,
+        target_value=target_value,
+    )
+    session.add(goal)
+    session.commit()
+    session.refresh(goal)
+    return goal
+
+def get_user_goals(
+    session: Session,
+    user_id: int,
+) -> List[Goal]:
+    """
+    Retrieve all goals set by the user.
+    """
+    logging.info(f"get_user_goals called for user_id={user_id}")
+    statement = select(Goal).where(Goal.user_id == user_id)
+    return session.exec(statement).all()
+ 
+def create_default_goals(
+    session: Session,
+    user_id: int,
+) -> List[Goal]:
+    """
+    Create default goals for the given user based on metrics config.
+    """
+    logging.info(f"create_default_goals called for user_id={user_id}")
+    created_goals: List[Goal] = []
+    metrics = config.get_metrics()
+    for m in metrics:
+        default_goal = m.get("default_goal")
+        if default_goal is not None:
+            goal = create_goal(session, user_id, m["key"], default_goal)
+            created_goals.append(goal)
+    return created_goals
+
+def upsert_goal(
+    session: Session,
+    user_id: int,
+    metric_key: str,
+    target_value: float,
+) -> Goal:
+    """
+    Insert or update a goal for the given user and metric.
+    If a goal exists, update its target_value and timestamp; otherwise create a new goal.
+    """
+    logging.info(f"upsert_goal called for user_id={user_id}, metric_key={metric_key}, target_value={target_value}")
+    # Check for existing goal
+    statement = select(Goal).where(
+        Goal.user_id == user_id,
+        Goal.metric_key == metric_key,
+    )
+    existing = session.exec(statement).first()
+    if existing:
+        existing.target_value = target_value
+        existing.created_at = datetime.utcnow()
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return existing
+    # No existing goal; create a new one
+    return create_goal(session, user_id, metric_key, target_value)

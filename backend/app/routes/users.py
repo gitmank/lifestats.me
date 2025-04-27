@@ -4,7 +4,7 @@ import uuid, hashlib
 import logging
 
 from app.schemas import UserCreate, UserSignup, APIKeyOut, APIKeyDelete
-from app.crud import get_user_by_username, create_user, create_api_key, revoke_api_key
+from app.crud import get_user_by_username, create_user, create_api_key, revoke_api_key, create_default_goals
 from app.db import get_session
 from app.auth import get_current_user
 from app.dependencies import rate_limit_user
@@ -57,6 +57,8 @@ def signup(
     user = create_user(session, user_in.username)
     # Store first API key
     create_api_key(session, user.id, token_hash)
+    # Initialize default goals for the new user
+    create_default_goals(session, user.id)
     return UserSignup(username=user.username, token=token)
     
 @router.post("/keys/{username}", response_model=APIKeyOut)

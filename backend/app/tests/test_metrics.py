@@ -54,9 +54,10 @@ def test_add_and_read_metric_entry(token):
     get_resp = client.get("/api/metrics", headers=headers)
     assert get_resp.status_code == 200
     agg = get_resp.json()
-    # The daily average for water_intake should equal the value added
+    # The daily average for the metric should equal the value added
     assert isinstance(agg, dict)
-    assert agg.get("daily", {}).get(metric_key) == payload["value"]
+    daily = agg.get("daily", {})
+    assert daily.get("average_values", {}).get(metric_key) == payload["value"]
     
 def test_add_invalid_metric_key(token):
     """
@@ -99,5 +100,6 @@ def test_sum_multiple_entries_same_day(token):
     get_resp = client.get("/api/metrics", headers=headers)
     assert get_resp.status_code == 200
     agg = get_resp.json()
-    # The daily sum for sleep_hours should equal the sum of both values
-    assert agg.get("daily", {}).get(metric) == val1 + val2
+    # The daily average (sum over 1 day) should equal the sum of both values
+    daily = agg.get("daily", {})
+    assert daily.get("average_values", {}).get(metric) == val1 + val2

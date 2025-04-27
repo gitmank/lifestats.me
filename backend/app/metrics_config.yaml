@@ -2,15 +2,25 @@ metrics:
   - key: water_litres
     name: "water"
     unit: "litres"
+    default_goal: 2.0
+    goal: 2.0
   - key: calories_kcal
     name: "calories"
     unit: "kilocalories"
+    default_goal: 2000.0
+    goal: 2000.0
   - key: sleep_hours
     name: "sleep"
     unit: "hours"
+    default_goal: 8.0
+    goal: 8.0
   - key: productivity_hours
     name: "productivity"
     unit: "hours"
+    default_goal: 8.0
+    goal: 6.0
   - key: exercise_hours
     name: "exercise"
     unit: "hours"
+    default_goal: 1.0
+    goal: 2.0

@@ -7,6 +7,7 @@ from app.db import engine
 from app.routes.users import router as users_router
 from app.routes.metrics import router as metrics_router
 from app.routes.root import router as root_router
+from app.routes.goals import router as goals_router
 
 app = FastAPI()
 
@@ -37,3 +38,4 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 app.include_router(root_router)
 app.include_router(users_router)
 app.include_router(metrics_router)
+app.include_router(goals_router)
