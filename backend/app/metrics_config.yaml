@@ -2,7 +2,7 @@ metrics:
   - key: water_litres
     name: "water"
     unit: "litres"
-  - key: calorie_kcal
+  - key: calories_kcal
     name: "calories"
     unit: "kilocalories"
   - key: sleep_hours
