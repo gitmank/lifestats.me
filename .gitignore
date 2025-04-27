@@ -61,3 +61,6 @@ compiled/
 # Frontend build
 frontend/dist/
 PROJECT_PLAN.md
+
+# pm2 config
+ecosystem.config.js
