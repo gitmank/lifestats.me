@@ -8,7 +8,6 @@ class Config:
         with open(config_path, "r") as f:
             data = yaml.safe_load(f)
         self.metrics = data.get("metrics", [])
-        # Log loaded metrics configuration
         logging.info(f"Loaded metrics config: {self.metrics}")
 
     def get_metrics(self):

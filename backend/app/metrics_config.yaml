@@ -1,16 +1,16 @@
 metrics:
-  - key: water_intake
-    name: "Water"
-    unit: "ml"
-  - key: calorie_intake
-    name: "Calories"
-    unit: "kcal"
+  - key: water_litres
+    name: "water"
+    unit: "litres"
+  - key: calorie_kcal
+    name: "calories"
+    unit: "kilocalories"
   - key: sleep_hours
-    name: "Sleep"
+    name: "sleep"
     unit: "hours"
-  - key: productive_hours
-    name: "Productivity"
+  - key: productivity_hours
+    name: "productivity"
     unit: "hours"
   - key: exercise_hours
-    name: "Exercise"
+    name: "exercise"
     unit: "hours"
