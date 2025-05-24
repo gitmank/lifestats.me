@@ -17,9 +17,29 @@ from app.dependencies import rate_limit_user
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
 
 @router.get("/config", response_model=List[MetricConfig])
-def get_metrics_config():
-    logging.info("get_metrics_config endpoint called")
-    return config.get_metrics()
+def get_metrics_config(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    logging.info(f"get_metrics_config endpoint called for user_id={current_user.id}")
+    
+    # Get base configuration
+    base_config = config.get_metrics()
+    
+    # Get user's custom goals
+    user_goals = get_user_goals(session, current_user.id)
+    goal_map = {goal.metric_key: goal.target_value for goal in user_goals}
+    
+    # Merge user goals with base config
+    result = []
+    for metric in base_config:
+        metric_dict = metric.copy()
+        # Use user's custom goal if available, otherwise use default_goal
+        metric_dict["goal"] = goal_map.get(metric["key"], metric.get("default_goal", 0))
+        result.append(metric_dict)
+    
+    return result
 
 @router.get("", response_model=AggregatedMetrics)
 def read_metrics(
