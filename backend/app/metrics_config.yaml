@@ -8,7 +8,7 @@ metrics:
   - key: calories_kcal
     name: "calories"
     unit: "kilocalories"
-    type: "min"
+    type: "max"
     default_goal: 2000.0
     goal: 2000.0
   - key: sleep_hours
