@@ -33,7 +33,7 @@ export default function GoalCompletionChart({
       const data = payload[0];
       return (
         <div className="bg-white p-2 border border-green-200 rounded-lg shadow-lg">
-          <p className="text-sm text-gray-700">
+          <p className="text-xs sm:text-sm text-gray-700">
             {data.name}: {data.value} day{data.value !== 1 ? 's' : ''}
           </p>
         </div>
@@ -66,13 +66,13 @@ export default function GoalCompletionChart({
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-green-700">{percentage}%</span>
+          <span className="text-xl sm:text-2xl font-bold text-green-700">{percentage}%</span>
           <span className="text-xs text-gray-500 text-center leading-tight">
             {completed}/{total}
           </span>
         </div>
       </div>
-      <h3 className="text-sm font-medium text-gray-700 capitalize text-center">
+      <h3 className="text-xs sm:text-sm font-medium text-gray-700 capitalize text-center">
         {metricName}
       </h3>
     </div>

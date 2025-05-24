@@ -26,23 +26,9 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const [config, setConfig] = useState<MetricConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [editingGoal, setEditingGoal] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [addingMetric, setAddingMetric] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-
-  const copyApiKey = async () => {
-    const apiKey = localStorage.getItem('authToken');
-    if (apiKey) {
-      try {
-        await navigator.clipboard.writeText(apiKey);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy API key:', err);
-      }
-    }
-  };
 
   const handleEditGoal = (metric: MetricConfig) => {
     setEditingGoal({ metric, isOpen: true });
@@ -160,48 +146,25 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-green-100">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">Life Stats Dashboard</h1>
-                <p className="text-sm text-gray-600">Welcome back, {username}!</p>
+                <h1 className="text-lg sm:text-xl font-bold text-gray-800">Life Stats Dashboard</h1>
+                <p className="text-xs sm:text-sm text-gray-600">Welcome back, {username}!</p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-700">
-                  {(() => {
-                    const apiKey = localStorage.getItem('authToken');
-                    if (apiKey && apiKey.length >= 4) {
-                      return `Key:****-${apiKey.slice(-4)}`;
-                    }
-                    return 'API Key';
-                  })()}
-                </p>
-                <button
-                  onClick={copyApiKey}
-                  className="flex items-center space-x-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <span>Click to copy</span>
-                  {copied ? (
-                    <Check className="w-3 h-3 text-green-500" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </button>
-              </div>
-
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <button
                 onClick={() => setShowProfile(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
               >
                 <Settings className="w-4 h-4" />
-                <span>Manage</span>
+                <span className="hidden sm:inline">Manage</span>
               </button>
             </div>
           </div>
@@ -209,9 +172,9 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8">
         {/* Period Selector */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6 sm:mb-8">
           <PeriodSelector 
             selectedPeriod={selectedPeriod} 
             onPeriodChange={setSelectedPeriod}
@@ -219,38 +182,38 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </div>
 
         {/* Period Info */}
-        <div className="text-center mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+        <div className="text-center mb-6 sm:mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">
             Goal Completion for the Last {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1, -2)}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Days completed out of {totalDays} possible days
           </p>
         </div>
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 justify-items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8 justify-items-center">
           {config.map((metric) => {
             const completed = currentPeriodData?.goalReached?.[metric.key] || 0;
             return (
-              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow relative">
+              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[200px]">
                 {/* Plus button in top right corner */}
                 <button
                   onClick={() => handleAddMetric(metric)}
-                  className="absolute top-3 right-3 p-1.5 hover:bg-green-100 rounded-full transition-colors"
+                  className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 sm:p-1.5 hover:bg-green-100 rounded-full transition-colors"
                   title="Log metric"
                 >
-                  <Plus className="w-4 h-4 text-green-600 hover:text-green-700" />
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 hover:text-green-700" />
                 </button>
                 
                 <GoalCompletionChart
                   completed={completed}
                   total={totalDays}
                   metricName={metric.name}
-                  size={140}
+                  size={120}
                 />
-                <div className="mt-4 text-center">
-                  <div className="flex items-center justify-center space-x-2">
+                <div className="mt-3 sm:mt-4 text-center">
+                  <div className="flex items-center justify-center space-x-1 sm:space-x-2">
                     <p className="text-xs text-gray-500">
                       Goal: <span className="font-bold text-gray-700">{metric.goal || 'Not set'}</span> {metric.unit}
                     </p>
@@ -269,19 +232,19 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </div>
 
         {/* Summary Stats */}
-        <div className="mt-12 bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
+        <div className="mt-8 sm:mt-12 bg-white rounded-xl shadow-lg p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 text-center">
             {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1, -2)} Summary
           </h3>
           
           {selectedPeriod === 'weekly' ? (
             /* Weekly Daily Totals Grid */
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Day Labels */}
               <div className="flex justify-center">
-                <div className="grid grid-cols-7 gap-2 text-xs text-gray-500 font-medium">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 text-xs text-gray-500 font-medium">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <div key={day} className="w-8 text-center">
+                    <div key={day} className="w-6 sm:w-8 text-center">
                       {day}
                     </div>
                   ))}
@@ -289,17 +252,17 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
               </div>
               
               {/* Metrics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
                 {config.map((metric) => {
                   const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
                   const goal = metric.goal;
                   
                   return (
                     <div key={metric.key} className="text-center">
-                      <div className="text-sm font-medium text-gray-700 capitalize mb-3">
+                      <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
                         {metric.name}
                       </div>
-                      <div className="flex justify-center space-x-2 mb-2">
+                      <div className="flex justify-center space-x-1 sm:space-x-2 mb-2">
                         {dailyTotals.map((value: number, dayIndex: number) => {
                           const isGoalMet = value >= goal;
                           const intensity = Math.min(value / goal, 1); // Cap at 100%
@@ -308,7 +271,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                           return (
                             <div
                               key={dayIndex}
-                              className={`w-8 h-8 rounded border flex items-center justify-center text-xs font-medium cursor-help ${
+                              className={`w-6 h-6 sm:w-8 sm:h-8 rounded border flex items-center justify-center text-xs font-medium cursor-help ${
                                 isGoalMet 
                                   ? 'bg-green-500 text-white shadow-sm border-green-200' 
                                   : 'bg-red-100 text-red-700 border-red-200'
@@ -321,7 +284,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                               }}
                               title={`Day ${dayIndex + 1}: ${value} ${metric.unit} (Goal: ${goal})`}
                             >
-                              {Math.round(value)}
+                              <span className="text-xs">{Math.round(value)}</span>
                             </div>
                           );
                         })}
@@ -336,7 +299,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
             </div>
           ) : (
             /* Monthly/Yearly Average Values Grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
               {config.map((metric) => {
                 const average = currentPeriodData?.average_values?.[metric.key] || 0;
                 const goal = metric.goal;
@@ -344,12 +307,12 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 
                 return (
                   <div key={metric.key} className="text-center">
-                    <div className="text-sm font-medium text-gray-700 capitalize mb-3">
+                    <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
                       {metric.name}
                     </div>
                     <div className="flex justify-center mb-2">
                       <div
-                        className={`w-16 h-16 rounded-lg border flex items-center justify-center text-sm font-medium cursor-help ${
+                        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg border flex items-center justify-center text-xs sm:text-sm font-medium cursor-help ${
                           isGoalMet 
                             ? 'bg-green-500 text-white shadow-sm border-green-200' 
                             : 'bg-red-100 text-red-700 border-red-200'

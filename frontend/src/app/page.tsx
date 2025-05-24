@@ -61,10 +61,10 @@ export default function Home() {
 
   if (appState === 'loading') {
   return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-8">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-3 sm:p-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+          <p className="text-gray-600 mt-4 text-sm sm:text-base">Loading...</p>
         </div>
     </div>
   );

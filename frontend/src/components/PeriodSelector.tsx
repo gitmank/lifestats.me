@@ -13,12 +13,12 @@ const periods = [
 
 export default function PeriodSelector({ selectedPeriod, onPeriodChange }: PeriodSelectorProps) {
   return (
-    <div className="flex space-x-1 bg-green-50 p-1 rounded-lg border border-green-200">
+    <div className="flex space-x-0.5 sm:space-x-1 bg-green-50 p-0.5 sm:p-1 rounded-lg border border-green-200">
       {periods.map((period) => (
         <button
           key={period.value}
           onClick={() => onPeriodChange(period.value)}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+          className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
             selectedPeriod === period.value
               ? 'bg-green-500 text-white shadow-sm'
               : 'text-green-700 hover:bg-green-100'
