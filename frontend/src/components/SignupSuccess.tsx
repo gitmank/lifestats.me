@@ -81,7 +81,7 @@ Generated on: ${new Date().toLocaleString()}
               {token}
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Keep this API key safe! You'll need it to sign in to your dashboard.
+              Keep this API key safe! You&apos;ll need it to sign in to your dashboard.
             </p>
           </div>
 
@@ -131,7 +131,7 @@ Generated on: ${new Date().toLocaleString()}
                 <h3 className="text-sm font-medium text-yellow-800">Important</h3>
                 <p className="text-xs text-yellow-700 mt-1">
                   Make sure to save your API key! You can copy it now or download it as a text file. 
-                  You'll use this key to sign in to your dashboard in the future.
+                  You&apos;ll use this key to sign in to your dashboard in the future.
                 </p>
               </div>
             </div>

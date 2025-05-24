@@ -40,7 +40,7 @@ export default function AddMetricModal({
       await onSave(numValue, timestamp);
       setMetricValue('');
       onClose();
-    } catch (err) {
+    } catch {
       setError('Failed to save metric. Please try again.');
     } finally {
       setIsSaving(false);

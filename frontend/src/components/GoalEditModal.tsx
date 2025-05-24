@@ -37,7 +37,7 @@ export default function GoalEditModal({
     try {
       await onSave(numValue);
       onClose();
-    } catch (err) {
+    } catch {
       setError('Failed to save goal. Please try again.');
     } finally {
       setIsSaving(false);

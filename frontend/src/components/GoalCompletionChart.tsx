@@ -28,7 +28,7 @@ export default function GoalCompletionChart({
     { name: 'Remaining', value: remaining, color: COLORS.remaining },
   ];
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
     if (active && payload && payload.length) {
       const data = payload[0];
       return (

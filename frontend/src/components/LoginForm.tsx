@@ -209,7 +209,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             </button>
 
             <p className="text-xs text-gray-500 text-center">
-              No password required - you'll get an API key after signup
+              No password required - you&apos;ll get an API key after signup
             </p>
           </form>
         )}
