@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Plus, Trash2, Copy, Check, AlertTriangle, User, Key, Calendar, Download, LogOut, X } from 'lucide-react';
 import { APIKeyInfo, NewAPIKey, UserInfo, apiClient } from '@/lib/api';
 
@@ -48,7 +48,7 @@ export default function Profile({ username, onBack, onLogout }: ProfileProps) {
     }
   };
 
-  const fetchAPIKeys = async () => {
+  const fetchAPIKeys = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -60,7 +60,7 @@ export default function Profile({ username, onBack, onLogout }: ProfileProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [username]);
 
   const calculateMemberSinceDays = () => {
     if (!userInfo?.created_at) return 'Unknown';
@@ -86,7 +86,7 @@ export default function Profile({ username, onBack, onLogout }: ProfileProps) {
     }
   };
 
-  const handleDeleteAPIKey = async (keyId: number, keyPreview: string) => {
+  const handleDeleteAPIKey = async (keyId: number) => {
     try {
       setDeletingKeyId(keyId);
       setError('');
@@ -200,7 +200,7 @@ Generated on: ${new Date().toLocaleString()}
     
     fetchData();
     calculateCurrentKeyHash();
-  }, []);
+  }, [fetchAPIKeys]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
@@ -283,7 +283,7 @@ Generated on: ${new Date().toLocaleString()}
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="w-4 h-4" />
                 <span>
-                  You've reached the maximum of 5 API keys. Delete an existing key to create a new one.
+                  You&apos;ve reached the maximum of 5 API keys. Delete an existing key to create a new one.
                 </span>
               </div>
             </div>
@@ -301,7 +301,7 @@ Generated on: ${new Date().toLocaleString()}
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-medium text-green-800">New API Key Created</h3>
-                  <p className="text-sm text-green-600 mt-1">Copy this key now - it won't be shown again</p>
+                  <p className="text-sm text-green-600 mt-1">Copy this key now - it won&apos;t be shown again</p>
                 </div>
                 <button
                   onClick={() => setNewKeyData(null)}
@@ -395,7 +395,7 @@ Generated on: ${new Date().toLocaleString()}
                       </td>
                       <td className="py-3 px-4">
                         <button
-                          onClick={() => handleDeleteAPIKey(key.id, key.key_preview)}
+                          onClick={() => handleDeleteAPIKey(key.id)}
                           disabled={deletingKeyId === key.id}
                           className="p-2 hover:bg-red-100 rounded-full transition-colors group"
                           title="Delete API key"
@@ -487,7 +487,7 @@ Generated on: ${new Date().toLocaleString()}
             
             <div className="space-y-4 text-sm text-gray-600">
               <p>
-                For security reasons, we don't store your actual API keys. Instead, we store and display 
+                For security reasons, we don&apos;t store your actual API keys. Instead, we store and display 
                 the <strong>last 8 characters of the SHA-256 hash</strong> of your key as a preview.
               </p>
               
