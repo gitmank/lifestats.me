@@ -1,5 +1,6 @@
 import app.logging_config  # initialize logging to SQLite
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import SQLModel
 
@@ -10,6 +11,21 @@ from app.routes.root import router as root_router
 from app.routes.goals import router as goals_router
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # Development
+        "https://lifestats-me.vercel.app",  # Your specific Vercel domain
+        "https://lifestats.vercel.app",     # Alternative domain
+        "https://lifestats.me",             # Your custom domain
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow any Vercel subdomain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
