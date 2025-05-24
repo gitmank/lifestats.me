@@ -15,6 +15,7 @@ class UserSignup(UserBase):
 
 class UserRead(UserBase):
     id: int
+    created_at: Optional[datetime] = None
 
 class MetricConfig(SQLModel):
     key: str
@@ -50,7 +51,15 @@ class APIKeyDelete(SQLModel):
     Request model for deleting an API key.
     """
     token: str
-    
+
+class APIKeyInfo(SQLModel):
+    """
+    Response model for listing API keys (without exposing actual values).
+    """
+    id: int
+    created_at: datetime
+    key_preview: str
+
 class GoalBase(SQLModel):
     """
     Base schema for a user-defined goal.

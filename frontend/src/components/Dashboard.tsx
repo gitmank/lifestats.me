@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LogOut, TrendingUp, Copy, Check, Edit2, Plus } from 'lucide-react';
+import { Settings, TrendingUp, Copy, Check, Edit2, Plus } from 'lucide-react';
 import GoalCompletionChart from './GoalCompletionChart';
 import PeriodSelector from './PeriodSelector';
 import GoalEditModal from './GoalEditModal';
 import AddMetricModal from './AddMetricModal';
+import Profile from './Profile';
 import { MetricConfig, AggregatedMetrics, apiClient } from '@/lib/api';
 
 interface DashboardProps {
@@ -28,6 +29,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const [copied, setCopied] = useState(false);
   const [editingGoal, setEditingGoal] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [addingMetric, setAddingMetric] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   const copyApiKey = async () => {
     const apiKey = localStorage.getItem('authToken');
@@ -110,6 +112,16 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
     fetchData();
   }, []);
 
+  if (showProfile) {
+    return (
+      <Profile
+        username={username}
+        onBack={() => setShowProfile(false)}
+        onLogout={onLogout}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
@@ -147,36 +159,51 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-green-200">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Life Stats Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {username}</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-xs text-gray-500 mb-1">Your API Key (click to copy):</p>
+      <div className="bg-white shadow-sm border-b border-green-100">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">Life Stats Dashboard</h1>
+                <p className="text-sm text-gray-600">Welcome back, {username}!</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-700">
+                  {(() => {
+                    const apiKey = localStorage.getItem('authToken');
+                    if (apiKey && apiKey.length >= 4) {
+                      return `Key:****-${apiKey.slice(-4)}`;
+                    }
+                    return 'API Key';
+                  })()}
+                </p>
+                <button
+                  onClick={copyApiKey}
+                  className="flex items-center space-x-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <span>Click to copy</span>
+                  {copied ? (
+                    <Check className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              </div>
+
               <button
-                onClick={copyApiKey}
-                className="flex items-center space-x-1 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                onClick={() => setShowProfile(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
               >
-                <code className="text-xs text-gray-700">
-                  {localStorage.getItem('authToken')?.substring(0, 12)}...
-                </code>
-                {copied ? (
-                  <Check className="w-3 h-3 text-green-500" />
-                ) : (
-                  <Copy className="w-3 h-3 text-gray-500" />
-                )}
+                <Settings className="w-4 h-4" />
+                <span>Manage</span>
               </button>
             </div>
-            <button
-              onClick={onLogout}
-              className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
           </div>
         </div>
       </div>

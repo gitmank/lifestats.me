@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Response
-from sqlmodel import Session
+from sqlmodel import Session, select
 import uuid, hashlib
 import logging
 
-from app.schemas import UserCreate, UserSignup, APIKeyOut, APIKeyDelete, UserRead
-from app.crud import get_user_by_username, create_user, create_api_key, revoke_api_key, create_default_goals
+from app.schemas import UserCreate, UserSignup, APIKeyOut, APIKeyDelete, UserRead, APIKeyInfo
+from app.crud import get_user_by_username, create_user, create_api_key, revoke_api_key, create_default_goals, get_user_api_keys, delete_user
 from app.db import get_session
 from app.auth import get_current_user
-from app.models import User
+from app.models import User, APIKey
 from app.dependencies import rate_limit_user
 import time
 
@@ -72,10 +72,20 @@ def generate_api_key(
 ):
     """
     Generate and return a new API key for the authenticated user.
+    Maximum of 5 API keys per user.
     """
     logging.info(f"generate_api_key called for username={username}")
     if username != current_user.username:
         raise HTTPException(status_code=403, detail="Not authorized to generate key for this user")
+    
+    # Check current API key count
+    existing_keys = get_user_api_keys(session, current_user.id)
+    if len(existing_keys) >= 5:
+        raise HTTPException(
+            status_code=400, 
+            detail="API key limit reached. You can have a maximum of 5 API keys. Please delete an existing key before creating a new one."
+        )
+    
     # Generate new token
     token = str(uuid.uuid4())
     key_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -100,6 +110,33 @@ def invalidate_api_key(
     key_hash = hashlib.sha256(key_in.token.encode()).hexdigest()
     revoke_api_key(session, current_user.id, key_hash)
 
+@router.delete("/keys/{username}/{key_id}", status_code=204)
+def delete_api_key_by_id(
+    username: str,
+    key_id: int,
+    current_user = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    Delete an API key by its ID for the authenticated user.
+    """
+    logging.info(f"delete_api_key_by_id called for username={username}, key_id={key_id}")
+    if username != current_user.username:
+        raise HTTPException(status_code=403, detail="Not authorized to delete key for this user")
+    
+    # Find and delete the API key by ID
+    statement = select(APIKey).where(
+        APIKey.id == key_id,
+        APIKey.user_id == current_user.id
+    )
+    api_key = session.exec(statement).first()
+    if not api_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    session.delete(api_key)
+    session.commit()
+
 @router.get("/me", response_model=UserRead)
 def get_current_user_info(
     current_user: User = Depends(get_current_user),
@@ -110,3 +147,42 @@ def get_current_user_info(
     """
     logging.info(f"get_current_user_info called for user_id={current_user.id}")
     return current_user
+
+@router.get("/keys/{username}", response_model=list[APIKeyInfo])
+def list_api_keys(
+    username: str,
+    current_user = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    List all API keys for the authenticated user (excluding the actual key values).
+    """
+    logging.info(f"list_api_keys called for username={username}")
+    if username != current_user.username:
+        raise HTTPException(status_code=403, detail="Not authorized to view keys for this user")
+    
+    api_keys = get_user_api_keys(session, current_user.id)
+    return [
+        APIKeyInfo(
+            id=key.id,
+            created_at=key.created_at,
+            key_preview=key.key_hash[-8:]
+        ) for key in api_keys
+    ]
+
+@router.delete("/user/{username}", status_code=204)
+def delete_user_account(
+    username: str,
+    current_user = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    Delete the authenticated user's account and all associated data.
+    """
+    logging.info(f"delete_user_account called for username={username}")
+    if username != current_user.username:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this user")
+    
+    delete_user(session, current_user.id)

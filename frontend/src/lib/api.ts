@@ -64,6 +64,23 @@ export interface User {
   token: string;
 }
 
+export interface UserInfo {
+  id: number;
+  username: string;
+  created_at?: string;
+}
+
+export interface APIKeyInfo {
+  id: number;
+  created_at: string;
+  key_preview: string;
+}
+
+export interface NewAPIKey {
+  token: string;
+  hint: string;
+}
+
 export const apiClient = {
   // Authentication
   async signup(username: string): Promise<User> {
@@ -71,9 +88,35 @@ export const apiClient = {
     return response.data;
   },
 
-  async getCurrentUser(): Promise<{ username: string }> {
+  async getCurrentUser(): Promise<UserInfo> {
     const response = await api.get('/api/me');
     return response.data;
+  },
+
+  // API Key Management
+  async listAPIKeys(username: string): Promise<APIKeyInfo[]> {
+    const response = await api.get(`/api/keys/${username}`);
+    return response.data;
+  },
+
+  async createAPIKey(username: string): Promise<NewAPIKey> {
+    const response = await api.post(`/api/keys/${username}`);
+    return response.data;
+  },
+
+  async deleteAPIKey(username: string, token: string): Promise<void> {
+    await api.delete(`/api/keys/${username}`, {
+      data: { token }
+    });
+  },
+
+  async deleteAPIKeyById(username: string, keyId: number): Promise<void> {
+    await api.delete(`/api/keys/${username}/${keyId}`);
+  },
+
+  // User Management
+  async deleteAccount(username: string): Promise<void> {
+    await api.delete(`/api/user/${username}`);
   },
 
   // Metrics

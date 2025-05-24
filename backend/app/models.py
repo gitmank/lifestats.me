@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, Index, String
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     metrics: List["MetricEntry"] = Relationship(back_populates="user")
     api_keys: List["APIKey"] = Relationship(back_populates="user")
     # User-defined goals for tracked metrics

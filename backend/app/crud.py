@@ -54,6 +54,46 @@ def get_user_by_username(session: Session, username: str) -> Optional[User]:
     statement = select(User).where(User.username == username)
     return session.exec(statement).first()
 
+def get_user_api_keys(session: Session, user_id: int) -> List[APIKey]:
+    """
+    Retrieve all API keys for the given user.
+    """
+    logging.info(f"get_user_api_keys called for user_id={user_id}")
+    statement = select(APIKey).where(APIKey.user_id == user_id).order_by(APIKey.created_at.desc())
+    return session.exec(statement).all()
+
+def delete_user(session: Session, user_id: int) -> None:
+    """
+    Delete a user and all associated data (API keys, metrics, goals).
+    """
+    logging.info(f"delete_user called for user_id={user_id}")
+    
+    # Delete all API keys
+    statement = select(APIKey).where(APIKey.user_id == user_id)
+    api_keys = session.exec(statement).all()
+    for key in api_keys:
+        session.delete(key)
+    
+    # Delete all metric entries
+    statement = select(MetricEntry).where(MetricEntry.user_id == user_id)
+    metrics = session.exec(statement).all()
+    for metric in metrics:
+        session.delete(metric)
+    
+    # Delete all goals
+    statement = select(Goal).where(Goal.user_id == user_id)
+    goals = session.exec(statement).all()
+    for goal in goals:
+        session.delete(goal)
+    
+    # Delete the user
+    statement = select(User).where(User.id == user_id)
+    user = session.exec(statement).first()
+    if user:
+        session.delete(user)
+    
+    session.commit()
+
 def create_metric_entry(
     session: Session,
     user_id: int,
