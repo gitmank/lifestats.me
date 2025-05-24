@@ -9,6 +9,7 @@ interface AddMetricModalProps {
   onSave: (value: number, timestamp?: string) => Promise<void>;
   metricName: string;
   metricUnit: string;
+  metricType: string; // "min" or "max"
   goalValue: number;
 }
 
@@ -18,6 +19,7 @@ export default function AddMetricModal({
   onSave,
   metricName,
   metricUnit,
+  metricType,
   goalValue
 }: AddMetricModalProps) {
   const [metricValue, setMetricValue] = useState('');
@@ -102,7 +104,7 @@ export default function AddMetricModal({
 
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-xs sm:text-sm text-green-700">
-              <span className="font-medium">Goal:</span> {goalValue} {metricUnit}
+              <span className="font-medium">{metricType === 'max' ? 'Limit' : 'Goal'}:</span> {goalValue} {metricUnit}
             </p>
           </div>
 

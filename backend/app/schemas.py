@@ -21,6 +21,7 @@ class MetricConfig(SQLModel):
     key: str
     name: str
     unit: str
+    type: str  # "min" or "max"
     # Optional default goal value for this metric (from config)
     default_goal: Optional[float] = None
     goal: Optional[float] = None

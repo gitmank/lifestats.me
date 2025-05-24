@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, TrendingUp, Copy, Check, Edit2, Plus } from 'lucide-react';
+import { Settings, TrendingUp, Edit2, Plus, Info } from 'lucide-react';
 import GoalCompletionChart from './GoalCompletionChart';
 import PeriodSelector from './PeriodSelector';
 import GoalEditModal from './GoalEditModal';
@@ -29,6 +29,12 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const [editingGoal, setEditingGoal] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [addingMetric, setAddingMetric] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [tooltip, setTooltip] = useState<{ show: boolean; content: string; x: number; y: number }>({
+    show: false,
+    content: '',
+    x: 0,
+    y: 0
+  });
 
   const handleEditGoal = (metric: MetricConfig) => {
     setEditingGoal({ metric, isOpen: true });
@@ -73,6 +79,20 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
       console.error('Failed to add metric entry:', err);
       throw err;
     }
+  };
+
+  const handleTooltipShow = (event: React.MouseEvent, content: string) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({
+      show: true,
+      content,
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10
+    });
+  };
+
+  const handleTooltipHide = () => {
+    setTooltip({ show: false, content: '', x: 0, y: 0 });
   };
 
   const fetchData = async () => {
@@ -215,12 +235,12 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <div className="mt-3 sm:mt-4 text-center">
                   <div className="flex items-center justify-center space-x-1 sm:space-x-2">
                     <p className="text-xs text-gray-500">
-                      Goal: <span className="font-bold text-gray-700">{metric.goal || 'Not set'}</span> {metric.unit}
+                      {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{metric.goal || 'Not set'}</span> {metric.unit}
                     </p>
                     <button
                       onClick={() => handleEditGoal(metric)}
                       className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                      title="Edit goal"
+                      title={`Edit ${metric.type === 'max' ? 'limit' : 'goal'}`}
                     >
                       <Edit2 className="w-3 h-3 text-gray-400 hover:text-gray-600" />
                     </button>
@@ -244,7 +264,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
               <div className="flex justify-center">
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 text-xs text-gray-500 font-medium">
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <div key={day} className="w-6 sm:w-8 text-center">
+                    <div key={day} className="w-7 sm:w-9 text-center">
                       {day}
                     </div>
                   ))}
@@ -264,14 +284,15 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                       </div>
                       <div className="flex justify-center space-x-1 sm:space-x-2 mb-2">
                         {dailyTotals.map((value: number, dayIndex: number) => {
-                          const isGoalMet = value >= goal;
-                          const intensity = Math.min(value / goal, 1); // Cap at 100%
-                          const opacity = Math.max(0.2, intensity); // Minimum 20% opacity
+                          const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
+                          const roundedValue = Math.round(value);
+                          const valueStr = roundedValue.toString();
+                          const hasLargeNumber = valueStr.length > 3;
                           
                           return (
                             <div
                               key={dayIndex}
-                              className={`w-6 h-6 sm:w-8 sm:h-8 rounded border flex items-center justify-center text-xs font-medium cursor-help ${
+                              className={`w-7 h-7 sm:w-9 sm:h-9 rounded border flex items-center justify-center font-medium cursor-help ${
                                 isGoalMet 
                                   ? 'bg-green-500 text-white shadow-sm border-green-200' 
                                   : 'bg-red-100 text-red-700 border-red-200'
@@ -279,18 +300,29 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                               style={{
                                 backgroundColor: isGoalMet 
                                   ? '#10B981' 
-                                  : `rgba(239, 68, 68, ${opacity * 0.3 + 0.1})`, // Light red with opacity
+                                  : `rgba(239, 68, 68, ${Math.max(0.2, Math.min(value / goal, 1)) * 0.3 + 0.1})`,
                                 color: isGoalMet ? 'white' : '#DC2626'
                               }}
-                              title={`Day ${dayIndex + 1}: ${value} ${metric.unit} (Goal: ${goal})`}
+                              onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
+                              onMouseLeave={handleTooltipHide}
                             >
-                              <span className="text-xs">{Math.round(value)}</span>
+                              {hasLargeNumber ? (
+                                <Info className="w-3 h-3 sm:w-4 sm:h-4" />
+                              ) : (
+                                <span className={`font-medium ${
+                                  valueStr.length === 3 ? 'text-[10px] sm:text-xs' : 
+                                  valueStr.length === 2 ? 'text-xs sm:text-sm' : 
+                                  'text-xs sm:text-sm'
+                                }`}>
+                                  {roundedValue}
+                                </span>
+                              )}
                             </div>
                           );
                         })}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Goal: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                        {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
                       </div>
                     </div>
                   );
@@ -303,7 +335,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
               {config.map((metric) => {
                 const average = currentPeriodData?.average_values?.[metric.key] || 0;
                 const goal = metric.goal;
-                const isGoalMet = average >= goal;
+                const isGoalMet = metric.type === 'max' ? average <= goal : average >= goal;
                 
                 return (
                   <div key={metric.key} className="text-center">
@@ -317,13 +349,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                             ? 'bg-green-500 text-white shadow-sm border-green-200' 
                             : 'bg-red-100 text-red-700 border-red-200'
                         }`}
-                        title={`Average: ${average.toFixed(1)} ${metric.unit} (Goal: ${goal})`}
+                        onMouseEnter={(e) => handleTooltipShow(e, `Average: ${average.toFixed(1)} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
+                        onMouseLeave={handleTooltipHide}
                       >
                         {average.toFixed(1)}
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                      Goal: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                      {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
                     </div>
                   </div>
                 );
@@ -341,6 +374,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           onSave={handleSaveGoal}
           metricName={editingGoal.metric.name}
           metricUnit={editingGoal.metric.unit}
+          metricType={editingGoal.metric.type}
           currentGoal={editingGoal.metric.goal || 0}
         />
       )}
@@ -353,8 +387,23 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           onSave={handleSaveMetric}
           metricName={addingMetric.metric.name}
           metricUnit={addingMetric.metric.unit}
+          metricType={addingMetric.metric.type}
           goalValue={addingMetric.metric.goal || 0}
         />
+      )}
+
+      {/* Custom Tooltip */}
+      {tooltip.show && (
+        <div
+          className="fixed z-50 bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none transform -translate-x-1/2 -translate-y-full"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+          }}
+        >
+          {tooltip.content}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+        </div>
       )}
     </div>
   );

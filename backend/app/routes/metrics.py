@@ -64,6 +64,8 @@ def read_metrics(
     metric_keys = [m["key"] for m in config.get_metrics()]
     # Build baseline goals from config defaults, then override with user-set goals
     default_goal_map = {m["key"]: m.get("default_goal") for m in config.get_metrics() if m.get("default_goal") is not None}
+    # Build type map for goal comparison logic
+    type_map = {m["key"]: m.get("type", "min") for m in config.get_metrics()}
     goals = get_user_goals(session, current_user.id)
     goal_map = default_goal_map.copy()
     for g in sorted(goals, key=lambda x: x.created_at):
@@ -108,18 +110,26 @@ def read_metrics(
             base = {"average_values": avg_per_day, "daily_totals": daily_totals}
         else:
             base = {"average_values": avg_per_day}
-        # Compute goalReached for this period
+        # Count goal-reached days for this period
         dates = [(now.date() - timedelta(days=i)) for i in range(period_days[name])]
-        goal_counts: dict = {}
+        goal_counts = {}
         for key, target in goal_map.items():
             count = 0
+            metric_type = type_map.get(key, "min")
             for day in dates:
                 total = sum(
                     e.value for e in entries
                     if e.metric_key == key and e.timestamp.date() == day
                 )
-                if total >= target:
-                    count += 1
+                # Check goal completion based on metric type
+                if metric_type == "max":
+                    # For max goals (limits), goal is met when total <= target
+                    if total <= target:
+                        count += 1
+                else:
+                    # For min goals, goal is met when total >= target
+                    if total >= target:
+                        count += 1
             goal_counts[key] = count
         base["goalReached"] = goal_counts
         aggregated[name] = base

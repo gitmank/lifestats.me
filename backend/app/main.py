@@ -1,5 +1,6 @@
 import app.logging_config  # initialize logging to SQLite
 import time
+import os
 from collections import defaultdict, deque
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,11 @@ app.add_middleware(
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Rate limiting middleware: 10 req/sec per API key for authenticated, 10 req/sec global for unauthenticated"""
+    # Skip rate limiting in test environment
+    if os.getenv("TESTING") == "true":
+        response = await call_next(request)
+        return response
+        
     current_time = time.time()
     
     # Extract API key from Authorization header

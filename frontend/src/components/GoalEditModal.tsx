@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Save, Edit } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface GoalEditModalProps {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface GoalEditModalProps {
   onSave: (newGoal: number) => Promise<void>;
   metricName: string;
   metricUnit: string;
+  metricType: string; // "min" or "max"
   currentGoal: number;
 }
 
@@ -18,6 +19,7 @@ export default function GoalEditModal({
   onSave,
   metricName,
   metricUnit,
+  metricType,
   currentGoal
 }: GoalEditModalProps) {
   const [goalValue, setGoalValue] = useState(currentGoal.toString());
@@ -57,7 +59,7 @@ export default function GoalEditModal({
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-base sm:text-lg font-semibold text-gray-800">
-            Edit Goal for {metricName}
+            Edit {metricType === 'max' ? 'Limit' : 'Goal'} for {metricName}
           </h2>
           <button
             onClick={handleClose}
@@ -70,14 +72,14 @@ export default function GoalEditModal({
         <div className="p-4 sm:p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Goal Value ({metricUnit})
+              {metricType === 'max' ? 'Limit' : 'Goal'} Value ({metricUnit})
             </label>
             <input
               type="number"
               value={goalValue}
               onChange={(e) => setGoalValue(e.target.value)}
               className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 text-sm sm:text-base"
-              placeholder="Enter goal value"
+              placeholder={`Enter ${metricType === 'max' ? 'limit' : 'goal'} value`}
               step="0.1"
               min="0"
               disabled={isSaving}
@@ -90,21 +92,20 @@ export default function GoalEditModal({
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
             <button
               onClick={handleClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm sm:text-base"
               disabled={isSaving}
-              className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm sm:text-base"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving || !goalValue}
-              className="flex-1 flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+              disabled={isSaving || !goalValue.trim()}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
             >
-              <Edit className="w-4 h-4" />
-              <span>{isSaving ? 'Saving...' : 'Save Goal'}</span>
+              {isSaving ? 'Saving...' : `Save ${metricType === 'max' ? 'Limit' : 'Goal'}`}
             </button>
           </div>
         </div>

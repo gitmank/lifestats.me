@@ -37,6 +37,7 @@ export interface MetricConfig {
   key: string;
   name: string;
   unit: string;
+  type: string; // "min" or "max"
   default_goal: number;
   goal: number;
 }

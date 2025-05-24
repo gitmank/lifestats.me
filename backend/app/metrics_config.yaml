@@ -2,25 +2,36 @@ metrics:
   - key: water_litres
     name: "water"
     unit: "litres"
+    type: "min"
     default_goal: 2.0
     goal: 2.0
   - key: calories_kcal
     name: "calories"
     unit: "kilocalories"
+    type: "min"
     default_goal: 2000.0
     goal: 2000.0
   - key: sleep_hours
     name: "sleep"
     unit: "hours"
+    type: "min"
     default_goal: 8.0
     goal: 8.0
   - key: productivity_hours
     name: "productivity"
     unit: "hours"
+    type: "min"
     default_goal: 8.0
     goal: 6.0
   - key: exercise_hours
     name: "exercise"
     unit: "hours"
+    type: "min"
     default_goal: 1.0
     goal: 2.0
+  - key: spend_rupees
+    name: "spends"
+    unit: "INR"
+    type: "max"
+    default_goal: 10000.0
+    goal: 10000.0
