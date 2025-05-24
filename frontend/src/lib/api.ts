@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use local Next.js API routes instead of external backend
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,6 +18,20 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Add response interceptor to handle errors properly
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.data?.detail) {
+      // Extract the error message from the backend response
+      const message = error.response.data.detail;
+      throw new Error(message);
+    }
+    // Fallback for other error types
+    throw new Error(error.message || 'An error occurred');
+  }
+);
 
 export interface MetricConfig {
   key: string;

@@ -1,4 +1,6 @@
 import app.logging_config  # initialize logging to SQLite
+import time
+from collections import defaultdict, deque
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,20 +14,66 @@ from app.routes.goals import router as goals_router
 
 app = FastAPI()
 
-# Add CORS middleware
+# Rate limiting storage
+request_times = defaultdict(lambda: deque())
+global_request_times = deque()
+
+# Add CORS middleware with wildcard
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Development
-        "https://lifestats-me.vercel.app",  # Your specific Vercel domain
-        "https://lifestats.vercel.app",     # Alternative domain
-        "https://lifestats.me",             # Your custom domain
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow any Vercel subdomain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware: 10 req/sec per API key for authenticated, 10 req/sec global for unauthenticated"""
+    current_time = time.time()
+    
+    # Extract API key from Authorization header
+    auth_header = request.headers.get("Authorization")
+    api_key = None
+    if auth_header and auth_header.startswith("Bearer "):
+        api_key = auth_header.split(" ", 1)[1]
+    
+    if api_key:
+        # Authenticated request - rate limit per API key
+        user_times = request_times[api_key]
+        
+        # Remove requests older than 1 second
+        while user_times and current_time - user_times[0] > 1.0:
+            user_times.popleft()
+        
+        # Check if rate limit exceeded
+        if len(user_times) >= 10:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests! You're sending requests too quickly. Please wait a few seconds and try again. (Limit: 10 requests per second)"
+            )
+        
+        # Add current request
+        user_times.append(current_time)
+    else:
+        # Unauthenticated request - global rate limit
+        # Remove requests older than 1 second
+        while global_request_times and current_time - global_request_times[0] > 1.0:
+            global_request_times.popleft()
+        
+        # Check if rate limit exceeded
+        if len(global_request_times) >= 10:
+            raise HTTPException(
+                status_code=429,
+                detail="Server is receiving too many requests right now. Please wait a few seconds and try again. Consider signing up for higher limits!"
+            )
+        
+        # Add current request
+        global_request_times.append(current_time)
+    
+    response = await call_next(request)
+    return response
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
