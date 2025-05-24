@@ -3,10 +3,11 @@ from sqlmodel import Session
 import uuid, hashlib
 import logging
 
-from app.schemas import UserCreate, UserSignup, APIKeyOut, APIKeyDelete
+from app.schemas import UserCreate, UserSignup, APIKeyOut, APIKeyDelete, UserRead
 from app.crud import get_user_by_username, create_user, create_api_key, revoke_api_key, create_default_goals
 from app.db import get_session
 from app.auth import get_current_user
+from app.models import User
 from app.dependencies import rate_limit_user
 import time
 
@@ -98,3 +99,14 @@ def invalidate_api_key(
         raise HTTPException(status_code=403, detail="Not authorized to revoke key for this user")
     key_hash = hashlib.sha256(key_in.token.encode()).hexdigest()
     revoke_api_key(session, current_user.id, key_hash)
+
+@router.get("/me", response_model=UserRead)
+def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    Get information about the currently authenticated user.
+    """
+    logging.info(f"get_current_user_info called for user_id={current_user.id}")
+    return current_user

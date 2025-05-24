@@ -22,6 +22,7 @@ class MetricConfig(SQLModel):
     unit: str
     # Optional default goal value for this metric (from config)
     default_goal: Optional[float] = None
+    goal: Optional[float] = None
 
 class MetricEntryBase(SQLModel):
     metric_key: str
