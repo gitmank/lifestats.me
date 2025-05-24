@@ -92,22 +92,9 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
       setLoading(true);
       setError('');
 
-      const [metricsResponse, configResponse] = await Promise.all([
-        fetch('/api/metrics', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          },
-        }),
-        fetch('/api/metrics/config'),
-      ]);
-
-      if (!metricsResponse.ok || !configResponse.ok) {
-        throw new Error('Failed to fetch data');
-      }
-
       const [metricsData, configData] = await Promise.all([
-        metricsResponse.json(),
-        configResponse.json(),
+        apiClient.getMetrics(),
+        apiClient.getMetricsConfig(),
       ]);
 
       setMetrics(metricsData);

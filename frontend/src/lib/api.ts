@@ -56,6 +56,11 @@ export const apiClient = {
     return response.data;
   },
 
+  async getCurrentUser(): Promise<{ username: string }> {
+    const response = await api.get('/api/me');
+    return response.data;
+  },
+
   // Metrics
   async getMetricsConfig(): Promise<MetricConfig[]> {
     const response = await api.get('/api/metrics/config');

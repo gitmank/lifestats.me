@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { User, Key } from 'lucide-react';
+import { apiClient } from '../lib/api';
 
 interface LoginFormProps {
   onLogin: (username: string, token: string, isNewSignup?: boolean) => void;
@@ -26,31 +27,20 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     try {
       console.log('Attempting sign in with API key:', apiKey.trim());
       
+      // Set the token in localStorage temporarily for the API call
+      localStorage.setItem('authToken', apiKey.trim());
+      
       // Validate the API key by getting user info
-      const response = await fetch('/api/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey.trim()}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Sign in response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Sign in error response data:', errorData);
-        throw new Error('Invalid API key');
-      }
-
-      const userData = await response.json();
+      const userData = await apiClient.getCurrentUser();
       console.log('Sign in success response data:', userData);
       
       // Use the username from the API response
       onLogin(userData.username, apiKey.trim(), false);
     } catch (err) {
       console.error('Sign in error:', err);
-      setError(err instanceof Error ? err.message : 'Invalid API key');
+      // Remove the invalid token
+      localStorage.removeItem('authToken');
+      setError('Invalid API key');
     } finally {
       setIsLoading(false);
     }
@@ -67,24 +57,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
       console.log('Attempting signup with username:', username.trim());
       console.log('Request payload:', JSON.stringify({ username: username.trim() }));
       
-      const response = await fetch('/api/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username: username.trim() }),
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', [...response.headers.entries()]);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Error response data:', errorData);
-        throw new Error(errorData.detail || errorData.message || 'Failed to create account');
-      }
-
-      const data = await response.json();
+      const data = await apiClient.signup(username.trim());
       console.log('Success response data:', data);
       onLogin(data.username, data.token, true);
     } catch (err) {
