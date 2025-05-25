@@ -15,13 +15,14 @@ interface DashboardProps {
 }
 
 const periodDays = {
+  daily: 1,
   weekly: 7,
   monthly: 30,
   yearly: 365,
 };
 
 export default function Dashboard({ username, onLogout }: DashboardProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [metrics, setMetrics] = useState<AggregatedMetrics | null>(null);
   const [config, setConfig] = useState<MetricConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +163,27 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const currentPeriodData = metrics?.[selectedPeriod];
   const totalDays = periodDays[selectedPeriod];
 
+  // Get period label for display
+  const getPeriodLabel = (period: string) => {
+    switch (period) {
+      case 'daily': return 'Day';
+      case 'weekly': return 'Week';
+      case 'monthly': return 'Month';
+      case 'yearly': return 'Year';
+      default: return period;
+    }
+  };
+
+  const getPeriodDescription = (period: string) => {
+    switch (period) {
+      case 'daily': return 'Today\'s goal completion status';
+      case 'weekly': return 'Days completed out of 7 possible days';
+      case 'monthly': return 'Days completed out of 30 possible days';
+      case 'yearly': return 'Days completed out of 365 possible days';
+      default: return `Days completed out of ${totalDays} possible days`;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       {/* Header */}
@@ -204,17 +226,29 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         {/* Period Info */}
         <div className="text-center mb-6 sm:mb-8">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">
-            Goal Completion for the Last {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1, -2)}
+            Goal Completion for the Last {getPeriodLabel(selectedPeriod)}
           </h2>
           <p className="text-sm sm:text-base text-gray-600">
-            Days completed out of {totalDays} possible days
+            {getPeriodDescription(selectedPeriod)}
           </p>
         </div>
 
         {/* Charts Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8 justify-items-center">
           {config.map((metric) => {
-            const completed = currentPeriodData?.goalReached?.[metric.key] || 0;
+            // For daily period, use average_values (actual values) and compare against goal
+            // For other periods, use goalReached (days completed) and compare against total days
+            let completed, total;
+            if (selectedPeriod === 'daily') {
+              const actualValue = currentPeriodData?.average_values?.[metric.key] || 0;
+              const goalValue = metric.goal || 0;
+              completed = actualValue; // Show actual value achieved
+              total = goalValue; // Compare against goal
+            } else {
+              completed = currentPeriodData?.goalReached?.[metric.key] || 0;
+              total = totalDays;
+            }
+            
             return (
               <div key={metric.key} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[200px]">
                 {/* Plus button in top right corner */}
@@ -228,9 +262,11 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 
                 <GoalCompletionChart
                   completed={completed}
-                  total={totalDays}
+                  total={total}
                   metricName={metric.name}
                   size={120}
+                  showRawValues={selectedPeriod === 'daily'}
+                  metricType={metric.type}
                 />
                 <div className="mt-3 sm:mt-4 text-center">
                   <div className="flex items-center justify-center space-x-1 sm:space-x-2">
@@ -251,75 +287,171 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           })}
         </div>
 
-        {/* Summary Stats */}
-        <div className="mt-8 sm:mt-12 bg-white rounded-xl shadow-lg p-4 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 text-center">
-            {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1, -2)} Summary
-          </h3>
-          
-          {selectedPeriod === 'weekly' ? (
-            /* Weekly Daily Totals Grid */
-            <div className="space-y-4 sm:space-y-6">
-              {/* Day Labels */}
-              <div className="flex justify-center">
-                <div className="grid grid-cols-7 gap-1 sm:gap-2 text-xs text-gray-500 font-medium">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <div key={day} className="w-7 sm:w-9 text-center">
-                      {day}
-                    </div>
-                  ))}
+        {/* Summary Stats - Only show for non-daily periods */}
+        {selectedPeriod !== 'daily' && (
+          <div className="mt-8 sm:mt-12 bg-white rounded-xl shadow-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 text-center">
+              {getPeriodLabel(selectedPeriod)} Summary
+            </h3>
+            
+            {selectedPeriod === 'weekly' ? (
+              /* Weekly Daily Totals Grid */
+              <div className="space-y-4 sm:space-y-6">
+                {/* Day Labels */}
+                <div className="flex justify-center">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 text-xs text-gray-500 font-medium">
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                      <div key={day} className="w-7 sm:w-9 lg:w-11 xl:w-12 text-center">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Metrics Grid - Custom Two-Row Layout */}
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Top Row - Water, Calories, Sleep */}
+                  <div className="grid grid-cols-3 gap-4 sm:gap-6 justify-items-center">
+                    {config.filter(metric => ['water_litres', 'calories_kcal', 'sleep_hours'].includes(metric.key)).map((metric) => {
+                      const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
+                      const goal = metric.goal;
+                      
+                      return (
+                        <div key={metric.key} className="text-center">
+                          <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
+                            {metric.name}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-2 justify-items-center">
+                            {dailyTotals.map((value: number, dayIndex: number) => {
+                              const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
+                              const roundedValue = Math.round(value);
+                              const valueStr = roundedValue.toString();
+                              const hasLargeNumber = valueStr.length > 3;
+                              
+                              return (
+                                <div
+                                  key={dayIndex}
+                                  className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
+                                    isGoalMet 
+                                      ? 'bg-green-500 text-white shadow-sm border-green-200' 
+                                      : 'bg-red-100 text-red-700 border-red-200'
+                                  }`}
+                                  style={{
+                                    backgroundColor: isGoalMet 
+                                      ? '#10B981' 
+                                      : `rgba(239, 68, 68, ${Math.max(0.2, Math.min(value / goal, 1)) * 0.3 + 0.1})`,
+                                    color: isGoalMet ? 'white' : '#DC2626'
+                                  }}
+                                  onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
+                                  onMouseLeave={handleTooltipHide}
+                                >
+                                  {hasLargeNumber ? (
+                                    <Info className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
+                                  ) : (
+                                    <span className={`font-medium ${
+                                      valueStr.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
+                                      valueStr.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
+                                      'text-xs sm:text-sm lg:text-base'
+                                    }`}>
+                                      {roundedValue}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bottom Row - Productivity, Exercise, Spends */}
+                  <div className="grid grid-cols-3 gap-4 sm:gap-6 justify-items-center">
+                    {config.filter(metric => ['productivity_hours', 'exercise_hours', 'spend_rupees'].includes(metric.key)).map((metric) => {
+                      const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
+                      const goal = metric.goal;
+                      
+                      return (
+                        <div key={metric.key} className="text-center">
+                          <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
+                            {metric.name}
+                          </div>
+                          <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-2 justify-items-center">
+                            {dailyTotals.map((value: number, dayIndex: number) => {
+                              const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
+                              const roundedValue = Math.round(value);
+                              const valueStr = roundedValue.toString();
+                              const hasLargeNumber = valueStr.length > 3;
+                              
+                              return (
+                                <div
+                                  key={dayIndex}
+                                  className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
+                                    isGoalMet 
+                                      ? 'bg-green-500 text-white shadow-sm border-green-200' 
+                                      : 'bg-red-100 text-red-700 border-red-200'
+                                  }`}
+                                  style={{
+                                    backgroundColor: isGoalMet 
+                                      ? '#10B981' 
+                                      : `rgba(239, 68, 68, ${Math.max(0.2, Math.min(value / goal, 1)) * 0.3 + 0.1})`,
+                                    color: isGoalMet ? 'white' : '#DC2626'
+                                  }}
+                                  onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
+                                  onMouseLeave={handleTooltipHide}
+                                >
+                                  {hasLargeNumber ? (
+                                    <Info className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
+                                  ) : (
+                                    <span className={`font-medium ${
+                                      valueStr.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
+                                      valueStr.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
+                                      'text-xs sm:text-sm lg:text-base'
+                                    }`}>
+                                      {roundedValue}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-              
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
+            ) : (
+              /* Monthly/Yearly Average Values Grid */
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
                 {config.map((metric) => {
-                  const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
+                  const average = currentPeriodData?.average_values?.[metric.key] || 0;
                   const goal = metric.goal;
+                  const isGoalMet = metric.type === 'max' ? average <= goal : average >= goal;
                   
                   return (
                     <div key={metric.key} className="text-center">
                       <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
                         {metric.name}
                       </div>
-                      <div className="flex justify-center space-x-1 sm:space-x-2 mb-2">
-                        {dailyTotals.map((value: number, dayIndex: number) => {
-                          const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
-                          const roundedValue = Math.round(value);
-                          const valueStr = roundedValue.toString();
-                          const hasLargeNumber = valueStr.length > 3;
-                          
-                          return (
-                            <div
-                              key={dayIndex}
-                              className={`w-7 h-7 sm:w-9 sm:h-9 rounded border flex items-center justify-center font-medium cursor-help ${
-                                isGoalMet 
-                                  ? 'bg-green-500 text-white shadow-sm border-green-200' 
-                                  : 'bg-red-100 text-red-700 border-red-200'
-                              }`}
-                              style={{
-                                backgroundColor: isGoalMet 
-                                  ? '#10B981' 
-                                  : `rgba(239, 68, 68, ${Math.max(0.2, Math.min(value / goal, 1)) * 0.3 + 0.1})`,
-                                color: isGoalMet ? 'white' : '#DC2626'
-                              }}
-                              onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
-                              onMouseLeave={handleTooltipHide}
-                            >
-                              {hasLargeNumber ? (
-                                <Info className="w-3 h-3 sm:w-4 sm:h-4" />
-                              ) : (
-                                <span className={`font-medium ${
-                                  valueStr.length === 3 ? 'text-[10px] sm:text-xs' : 
-                                  valueStr.length === 2 ? 'text-xs sm:text-sm' : 
-                                  'text-xs sm:text-sm'
-                                }`}>
-                                  {roundedValue}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div className="flex justify-center mb-2">
+                        <div
+                          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg border flex items-center justify-center text-xs sm:text-sm font-medium cursor-help ${
+                            isGoalMet 
+                              ? 'bg-green-500 text-white shadow-sm border-green-200' 
+                              : 'bg-red-100 text-red-700 border-red-200'
+                          }`}
+                          onMouseEnter={(e) => handleTooltipShow(e, `Average: ${average.toFixed(1)} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
+                          onMouseLeave={handleTooltipHide}
+                        >
+                          {average.toFixed(1)}
+                        </div>
                       </div>
                       <div className="text-xs text-gray-500">
                         {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
@@ -328,42 +460,9 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                   );
                 })}
               </div>
-            </div>
-          ) : (
-            /* Monthly/Yearly Average Values Grid */
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
-              {config.map((metric) => {
-                const average = currentPeriodData?.average_values?.[metric.key] || 0;
-                const goal = metric.goal;
-                const isGoalMet = metric.type === 'max' ? average <= goal : average >= goal;
-                
-                return (
-                  <div key={metric.key} className="text-center">
-                    <div className="text-sm font-medium text-gray-700 capitalize mb-2 sm:mb-3">
-                      {metric.name}
-                    </div>
-                    <div className="flex justify-center mb-2">
-                      <div
-                        className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg border flex items-center justify-center text-xs sm:text-sm font-medium cursor-help ${
-                          isGoalMet 
-                            ? 'bg-green-500 text-white shadow-sm border-green-200' 
-                            : 'bg-red-100 text-red-700 border-red-200'
-                        }`}
-                        onMouseEnter={(e) => handleTooltipShow(e, `Average: ${average.toFixed(1)} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
-                        onMouseLeave={handleTooltipHide}
-                      >
-                        {average.toFixed(1)}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Goal Edit Modal */}

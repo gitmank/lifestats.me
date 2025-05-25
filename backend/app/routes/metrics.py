@@ -53,13 +53,27 @@ def read_metrics(
     """
     logging.info(f"read_metrics called for user_id={current_user.id}")
     now = datetime.utcnow()
+    
+    # Calculate period start dates
+    today = now.date()
+    
+    # For weekly: find the start of current week (Monday)
+    days_since_monday = today.weekday()  # Monday=0, Sunday=6
+    current_week_start = today - timedelta(days=days_since_monday)
+    weekly_start = datetime.combine(current_week_start, datetime.min.time())
+    
+    # For daily: start from beginning of today to end of today
+    daily_start = datetime.combine(today, datetime.min.time())
+    daily_end = datetime.combine(today + timedelta(days=1), datetime.min.time())
+    
     periods = {
-        "daily": now - timedelta(days=1),
-        "weekly": now - timedelta(weeks=1),
+        "daily": daily_start,
+        "weekly": weekly_start,
         "monthly": now - timedelta(days=30),
         "quarterly": now - timedelta(days=90),
         "yearly": now - timedelta(days=365),
     }
+    
     # Determine all available metric keys from config
     metric_keys = [m["key"] for m in config.get_metrics()]
     # Build baseline goals from config defaults, then override with user-set goals
@@ -83,7 +97,12 @@ def read_metrics(
     # Compute aggregated metrics per period
     for name, start in periods.items():
         # Fetch entries in the period
-        entries = get_user_metrics(session, current_user.id, start, now)
+        if name == "daily":
+            # For daily: use the entire day (start to end of day)
+            entries = get_user_metrics(session, current_user.id, start, daily_end)
+        else:
+            # For other periods: use start to now
+            entries = get_user_metrics(session, current_user.id, start, now)
         # Sum values for each metric key
         sums: dict = {key: 0.0 for key in metric_keys}
         for entry in entries:
@@ -96,9 +115,20 @@ def read_metrics(
         for key in metric_keys:
             total = sums.get(key, 0.0)
             avg_per_day[key] = (total / days) if total != 0 else (None if not entries else 0.0 / days)
+        
+        # Calculate dates for this period consistently
+        if name == "weekly":
+            # For weekly: use Monday to Sunday dates in order
+            dates = [current_week_start + timedelta(days=i) for i in range(7)]
+        elif name == "daily":
+            # For daily: only include today
+            dates = [today]
+        else:
+            # For other periods: go back from today
+            dates = [(today - timedelta(days=i)) for i in reversed(range(period_days[name]))]
+        
         # Prepare the base aggregation for this period: wrap averages under 'average_values'
         if name == "weekly":
-            dates = [(now.date() - timedelta(days=i)) for i in reversed(range(period_days["weekly"]))]
             daily_totals: dict = {key: [] for key in metric_keys}
             for key in metric_keys:
                 for day in dates:
@@ -110,8 +140,8 @@ def read_metrics(
             base = {"average_values": avg_per_day, "daily_totals": daily_totals}
         else:
             base = {"average_values": avg_per_day}
-        # Count goal-reached days for this period
-        dates = [(now.date() - timedelta(days=i)) for i in range(period_days[name])]
+        
+        # Count goal-reached days for this period using the same dates
         goal_counts = {}
         for key, target in goal_map.items():
             count = 0

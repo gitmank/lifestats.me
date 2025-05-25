@@ -38,7 +38,12 @@ export default function AddMetricModal({
     setError('');
     
     try {
-      const timestamp = `${selectedDate}T${new Date().toTimeString().split(' ')[0]}`;
+      // Generate UTC timestamp
+      const now = new Date();
+      const utcTimeString = now.getUTCHours().toString().padStart(2, '0') + ':' + 
+                           now.getUTCMinutes().toString().padStart(2, '0') + ':' + 
+                           now.getUTCSeconds().toString().padStart(2, '0');
+      const timestamp = `${selectedDate}T${utcTimeString}`;
       await onSave(numValue, timestamp);
       setMetricValue('');
       onClose();

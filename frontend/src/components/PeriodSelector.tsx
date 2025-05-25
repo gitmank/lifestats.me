@@ -1,11 +1,12 @@
 'use client';
 
 interface PeriodSelectorProps {
-  selectedPeriod: 'weekly' | 'monthly' | 'yearly';
-  onPeriodChange: (period: 'weekly' | 'monthly' | 'yearly') => void;
+  selectedPeriod: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  onPeriodChange: (period: 'daily' | 'weekly' | 'monthly' | 'yearly') => void;
 }
 
 const periods = [
+  { value: 'daily' as const, label: 'Day', days: 1 },
   { value: 'weekly' as const, label: 'Week', days: 7 },
   { value: 'monthly' as const, label: 'Month', days: 30 },
   { value: 'yearly' as const, label: 'Year', days: 365 },
