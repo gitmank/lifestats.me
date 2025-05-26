@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.API_URL || 'http://localhost:8000';
 
-export async function DELETE(request: NextRequest, context: { params: { entryId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ entryId: string }> }
+): Promise<NextResponse> {
   try {
-    const { entryId } = context.params;
+    const { entryId } = await params;
     const authHeader = request.headers.get('authorization');
     const response = await fetch(`${API_BASE_URL}/api/metrics/${entryId}`, {
       method: 'DELETE',
