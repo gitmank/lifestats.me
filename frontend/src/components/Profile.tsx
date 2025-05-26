@@ -19,6 +19,15 @@ async function sha256(message: string): Promise<string> {
   return hashHex;
 }
 
+// Add MetricEntryRead type
+interface MetricEntryRead {
+  id: number;
+  user_id: number;
+  metric_key: string;
+  value: number;
+  timestamp: string;
+}
+
 export default function Profile({ username, onBack, onLogout }: ProfileProps) {
   const [apiKeys, setApiKeys] = useState<APIKeyInfo[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -38,6 +47,9 @@ export default function Profile({ username, onBack, onLogout }: ProfileProps) {
   const [showHashInfo, setShowHashInfo] = useState(false);
   const [testKey, setTestKey] = useState('');
   const [computedHash, setComputedHash] = useState('');
+
+  const [recentEntries, setRecentEntries] = useState<MetricEntryRead[]>([]);
+  const [deletingEntryId, setDeletingEntryId] = useState<number | null>(null);
 
   const copyApiKey = async () => {
     const apiKey = localStorage.getItem('authToken');
@@ -196,11 +208,37 @@ Generated on: ${new Date().toLocaleString()}
     }
   }, [testKey]);
 
+  // Fetch recent entries
+  const fetchRecentEntries = async () => {
+    try {
+      const entries = await apiClient.getRecentEntries();
+      setRecentEntries(entries);
+    } catch (err) {
+      console.error('Failed to fetch recent entries:', err);
+      setError('Failed to load recent entries');
+    }
+  };
+
+  const handleDeleteEntry = async (entryId: number) => {
+    try {
+      setDeletingEntryId(entryId);
+      setError('');
+      await apiClient.deleteMetricEntry(entryId);
+      await fetchRecentEntries();
+    } catch (err) {
+      console.error('Failed to delete entry:', err);
+      setError('Failed to delete entry');
+    } finally {
+      setDeletingEntryId(null);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       await Promise.all([
         fetchUserInfo(),
-        fetchAPIKeys()
+        fetchAPIKeys(),
+        fetchRecentEntries()
       ]);
     };
     
@@ -476,6 +514,102 @@ Generated on: ${new Date().toLocaleString()}
                             disabled={deletingKeyId === key.id}
                             className="p-2 hover:bg-red-100 rounded-full transition-colors group"
                             title="Delete API key"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Entries Section */}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-3 sm:space-y-0">
+            <div>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800">Recent Entries</h2>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                Your last 5 metric entries
+              </p>
+            </div>
+          </div>
+
+          {recentEntries.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 text-sm sm:text-base">No entries found</p>
+              <p className="text-xs sm:text-sm text-gray-500">Add entries from your dashboard</p>
+            </div>
+          ) : (
+            <div className="space-y-4 sm:space-y-0">
+              {/* Mobile Card Layout */}
+              <div className="block sm:hidden space-y-3">
+                {recentEntries.map((entry) => (
+                  <div key={entry.id} className="border rounded-lg p-3 bg-gray-50 border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <code className="bg-white px-2 py-1 rounded text-xs font-mono text-gray-800">
+                          {entry.metric_key}
+                        </code>
+                        <span className="text-sm font-medium text-gray-700">
+                          {entry.value}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        disabled={deletingEntryId === entry.id}
+                        className="p-1.5 hover:bg-red-100 rounded-full transition-colors group"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                      <Calendar className="w-3 h-3" />
+                      <span>{formatDate(entry.timestamp)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table Layout */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Metric</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Value</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentEntries.map((entry) => (
+                      <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800">
+                            {entry.metric_key}
+                          </code>
+                        </td>
+                        <td className="py-3 px-4 text-gray-700 font-medium">
+                          {entry.value}
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>{formatDate(entry.timestamp)}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            disabled={deletingEntryId === entry.id}
+                            className="p-2 hover:bg-red-100 rounded-full transition-colors group"
+                            title="Delete entry"
                           >
                             <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
                           </button>

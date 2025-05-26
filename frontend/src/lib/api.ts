@@ -140,6 +140,15 @@ export const apiClient = {
     return response.data;
   },
 
+  async getRecentEntries() {
+    const response = await api.get('/api/metrics/recent');
+    return response.data;
+  },
+
+  async deleteMetricEntry(entryId: number) {
+    await api.delete(`/api/metrics/${entryId}`);
+  },
+
   // Goals
   async updateGoal(metricKey: string, targetValue: number) {
     const response = await api.post('/api/goals', {

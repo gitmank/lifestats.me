@@ -8,7 +8,7 @@ from sqlmodel import Session
 
 from app.config import config
 from app.schemas import MetricConfig, MetricEntryCreate, MetricEntryRead, AggregatedMetrics
-from app.crud import create_metric_entry, get_user_metrics, get_user_goals
+from app.crud import create_metric_entry, get_user_metrics, get_user_goals, get_last_entries, delete_metric_entry
 from app.db import get_session
 from app.auth import get_current_user
 from app.models import User
@@ -198,3 +198,30 @@ def add_metric_entry(
         ts,
     )
     return entry
+
+@router.get("/recent", response_model=List[MetricEntryRead])
+def get_recent_entries(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    Get the last 5 metric entries for the authenticated user.
+    """
+    logging.info(f"get_recent_entries called for user_id={current_user.id}")
+    entries = get_last_entries(session, current_user.id)
+    return entries
+
+@router.delete("/{entry_id}")
+def delete_entry(
+    entry_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """
+    Delete a specific metric entry for the authenticated user.
+    """
+    logging.info(f"delete_entry called for user_id={current_user.id}, entry_id={entry_id}")
+    delete_metric_entry(session, current_user.id, entry_id)
+    return {"status": "success"}

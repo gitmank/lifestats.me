@@ -202,3 +202,25 @@ def upsert_goal(
         return existing
     # No existing goal; create a new one
     return create_goal(session, user_id, metric_key, target_value)
+
+def get_last_entries(session: Session, user_id: int, limit: int = 5) -> List[MetricEntry]:
+    """
+    Get the last N entries for the given user, ordered by timestamp descending.
+    """
+    logging.info(f"get_last_entries called for user_id={user_id}, limit={limit}")
+    statement = select(MetricEntry).where(MetricEntry.user_id == user_id).order_by(MetricEntry.timestamp.desc()).limit(limit)
+    return session.exec(statement).all()
+
+def delete_metric_entry(session: Session, user_id: int, entry_id: int) -> None:
+    """
+    Delete a specific metric entry for the given user.
+    """
+    logging.info(f"delete_metric_entry called for user_id={user_id}, entry_id={entry_id}")
+    statement = select(MetricEntry).where(
+        MetricEntry.id == entry_id,
+        MetricEntry.user_id == user_id
+    )
+    entry = session.exec(statement).first()
+    if entry:
+        session.delete(entry)
+        session.commit()
