@@ -19,7 +19,7 @@ def create_user(session: Session, username: str) -> User:
     initialize_user_metrics_config(session, user.id)
     
     return user
-
+    
 def initialize_user_metrics_config(session: Session, user_id: int) -> None:
     """
     Initialize a user's metrics configuration with default values from the global config.
