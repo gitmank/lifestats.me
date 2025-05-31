@@ -93,7 +93,7 @@ export default function GoalCompletionChart({
             <span className="text-xl sm:text-2xl font-bold text-green-700">{percentage}%</span>
           )}
           <span className="text-xs text-gray-500 text-center leading-tight">
-            {showRawValues ? `out of ${total}` : `${completed}/${total}`}
+            {showRawValues ? `of ${total}` : `${completed}/${total}`}
           </span>
         </div>
       </div>

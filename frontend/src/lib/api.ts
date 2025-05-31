@@ -159,6 +159,11 @@ export const apiClient = {
     return response.data;
   },
 
+  async getInactiveMetricsConfig(): Promise<MetricConfig[]> {
+    const response = await api.get('/api/metrics/config/inactive');
+    return response.data;
+  },
+
   async createMetricsConfig(config: UserMetricsConfigCreate): Promise<UserMetricsConfig> {
     const response = await api.post('/api/metrics/config', config);
     return response.data;

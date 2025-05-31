@@ -14,7 +14,8 @@ from app.schemas import (
 from app.crud import (
     create_metric_entry, get_user_metrics, get_user_goals, get_last_entries, 
     delete_metric_entry, get_user_metrics_config_active, get_user_metrics_config,
-    create_user_metrics_config, update_user_metrics_config, delete_user_metrics_config
+    get_user_metrics_config_inactive, create_user_metrics_config, update_user_metrics_config, 
+    delete_user_metrics_config
 )
 from app.db import get_session
 from app.auth import get_current_user
@@ -34,6 +35,34 @@ def get_metrics_config(
     
     # Get user's specific configuration
     user_configs = get_user_metrics_config_active(session, current_user.id)
+    
+    # Convert to MetricConfig format for compatibility
+    result = []
+    for config in user_configs:
+        metric_dict = {
+            "key": config.metric_key,
+            "name": config.metric_name,
+            "unit": config.unit,
+            "type": config.type,
+            "default_goal": config.default_goal,
+            "goal": config.goal,
+            "is_active": config.is_active
+        }
+        result.append(metric_dict)
+    
+    return result
+
+@router.get("/config/inactive", response_model=List[MetricConfig])
+def get_inactive_metrics_config(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """Get user-specific inactive metrics configuration."""
+    logging.info(f"get_inactive_metrics_config endpoint called for user_id={current_user.id}")
+    
+    # Get user's inactive configuration
+    user_configs = get_user_metrics_config_inactive(session, current_user.id)
     
     # Convert to MetricConfig format for compatibility
     result = []

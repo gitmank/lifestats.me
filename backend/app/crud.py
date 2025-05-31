@@ -276,6 +276,17 @@ def get_user_metrics_config_active(session: Session, user_id: int) -> List[UserM
     )
     return session.exec(statement).all()
 
+def get_user_metrics_config_inactive(session: Session, user_id: int) -> List[UserMetricsConfig]:
+    """
+    Get only inactive metrics configurations for a user.
+    """
+    logging.info(f"get_user_metrics_config_inactive called for user_id={user_id}")
+    statement = select(UserMetricsConfig).where(
+        UserMetricsConfig.user_id == user_id,
+        UserMetricsConfig.is_active == False
+    )
+    return session.exec(statement).all()
+
 def create_user_metrics_config(
     session: Session, 
     user_id: int, 

@@ -54,6 +54,7 @@ export default function Profile({ username, onBack, onLogout, onDataChange }: Pr
 
   // Metrics configuration state
   const [metricsConfig, setMetricsConfig] = useState<MetricConfig[]>([]);
+  const [inactiveMetrics, setInactiveMetrics] = useState<MetricConfig[]>([]);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [editingMetric, setEditingMetric] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserMetricsConfigUpdate>>({});
@@ -260,8 +261,15 @@ Generated on: ${new Date().toLocaleString()}
     try {
       setMetricsLoading(true);
       setError('');
-      const config = await apiClient.getMetricsConfig();
-      setMetricsConfig(config);
+      
+      // Fetch both active and inactive metrics from the API
+      const [activeConfig, inactiveConfig] = await Promise.all([
+        apiClient.getMetricsConfig(),
+        apiClient.getInactiveMetricsConfig()
+      ]);
+      
+      setMetricsConfig(activeConfig);
+      setInactiveMetrics(inactiveConfig);
     } catch (err) {
       console.error('Failed to fetch metrics config:', err);
       setError('Failed to load metrics configuration');
@@ -296,7 +304,7 @@ Generated on: ${new Date().toLocaleString()}
       setError('');
       
       await apiClient.updateMetricsConfig(metricKey, { is_active: !currentStatus });
-      await fetchMetricsConfig(); // Refresh the list
+      await fetchMetricsConfig(); // Refresh both active and inactive lists
       
       // Trigger background refresh in Dashboard
       onDataChange?.();
@@ -353,7 +361,7 @@ Generated on: ${new Date().toLocaleString()}
       setError('');
       
       await apiClient.deleteMetricsConfig(metricKey);
-      await fetchMetricsConfig(); // Refresh the list
+      await fetchMetricsConfig(); // Refresh both lists
       
       // Trigger background refresh in Dashboard
       onDataChange?.();
@@ -412,11 +420,11 @@ Generated on: ${new Date().toLocaleString()}
             </div>
 
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-700">
+              <p className="text-xs font-medium text-gray-700">
                 {(() => {
                   const apiKey = localStorage.getItem('authToken');
                   if (apiKey && apiKey.length >= 4) {
-                    return `Key:****-${apiKey.slice(-4)}`;
+                    return `Key:${apiKey.slice(-4)}`;
                   }
                   return 'API Key';
                 })()}
@@ -425,7 +433,7 @@ Generated on: ${new Date().toLocaleString()}
                 onClick={copyApiKey}
                 className="flex items-center space-x-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
               >
-                <span>Click to copy</span>
+                <span>Copy</span>
                 {copiedApiKey ? (
                   <Check className="w-3 h-3 text-green-500" />
                 ) : (
@@ -600,19 +608,10 @@ Generated on: ${new Date().toLocaleString()}
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">
-                        <div className="flex items-center space-x-2">
-                          <span>Key Hash:</span>
-                          <button
-                            onClick={() => setShowHashInfo(true)}
-                            className="p-1 hover:bg-yellow-100 rounded-full transition-colors"
-                            title="Learn about SHA-256 previews"
-                          >
-                            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                          </button>
-                        </div>
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">Created</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Metric</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Unit</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700">Goal</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
@@ -859,7 +858,7 @@ Generated on: ${new Date().toLocaleString()}
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
               <p className="text-gray-600 mt-2 text-sm">Loading metrics...</p>
             </div>
-          ) : metricsConfig.length === 0 ? (
+          ) : metricsConfig.length === 0 && inactiveMetrics.length === 0 ? (
             <div className="text-center py-8">
               <Settings className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-600 text-sm sm:text-base">No metrics configured</p>
@@ -869,7 +868,7 @@ Generated on: ${new Date().toLocaleString()}
             <div className="space-y-4 sm:space-y-0">
               {/* Mobile Card Layout */}
               <div className="block sm:hidden space-y-3">
-                {metricsConfig.map((metric) => (
+                {[...metricsConfig, ...inactiveMetrics].map((metric) => (
                   <div key={metric.key}>
                     {/* Regular Card */}
                     {editingMetric !== metric.key ? (
@@ -881,13 +880,6 @@ Generated on: ${new Date().toLocaleString()}
                             <code className="bg-white px-2 py-1 rounded text-xs font-mono text-gray-800">
                               {metric.key}
                             </code>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              metric.is_active 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-red-100 text-red-700'
-                            }`}>
-                              {metric.is_active ? 'Active' : 'Inactive'}
-                            </span>
                           </div>
                           <div className="flex items-center space-x-1">
                             <button
@@ -1007,12 +999,11 @@ Generated on: ${new Date().toLocaleString()}
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Unit</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Goal</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
                       <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {metricsConfig.map((metric) => (
+                    {[...metricsConfig, ...inactiveMetrics].map((metric) => (
                       <tr key={metric.key} className={`border-b border-gray-100 hover:bg-gray-50 ${
                         !metric.is_active ? 'opacity-60' : ''
                       }`}>
@@ -1061,15 +1052,6 @@ Generated on: ${new Date().toLocaleString()}
                               </span>
                             </span>
                           )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            metric.is_active 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {metric.is_active ? 'Active' : 'Inactive'}
-                          </span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">

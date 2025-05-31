@@ -68,6 +68,7 @@ const useSharedData = () => {
 };
 
 export default function Dashboard({ username, onLogout }: DashboardProps) {
+  const { metrics, config, loading, error, setConfig, refreshData, fetchData } = useSharedData();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [editingGoal, setEditingGoal] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [addingMetric, setAddingMetric] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
@@ -78,9 +79,20 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
     x: 0,
     y: 0
   });
+  const [chartSize, setChartSize] = useState(90);
 
-  // Use the shared data hook
-  const { metrics, config, loading, error, setConfig, refreshData, fetchData } = useSharedData();
+  // Handle responsive chart sizing
+  useEffect(() => {
+    const updateChartSize = () => {
+      if (typeof window !== 'undefined') {
+        setChartSize(window.innerWidth >= 1024 ? 110 : 90);
+      }
+    };
+
+    updateChartSize();
+    window.addEventListener('resize', updateChartSize);
+    return () => window.removeEventListener('resize', updateChartSize);
+  }, []);
 
   const handleEditGoal = (metric: MetricConfig) => {
     setEditingGoal({ metric, isOpen: true });
@@ -91,14 +103,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   };
 
   const handleSaveGoal = async (newGoal: number) => {
-    if (!editingGoal) return;
+    if (!editingGoal?.metric) return;
     
     try {
       await apiClient.updateGoal(editingGoal.metric.key, newGoal);
       
       // Update the local config state
-      setConfig(prevConfig => 
-        prevConfig.map(metric => 
+      setConfig((prevConfig: MetricConfig[]) => 
+        prevConfig.map((metric: MetricConfig) => 
           metric.key === editingGoal.metric.key 
             ? { ...metric, goal: newGoal }
             : metric
@@ -114,7 +126,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   };
 
   const handleSaveMetric = async (value: number, timestamp?: string) => {
-    if (!addingMetric) return;
+    if (!addingMetric?.metric) return;
     
     try {
       await apiClient.addMetricEntry(addingMetric.metric.key, value, timestamp);
@@ -138,7 +150,12 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   };
 
   const handleTooltipHide = () => {
-    setTooltip({ show: false, content: '', x: 0, y: 0 });
+    setTooltip({
+      show: false,
+      content: '',
+      x: 0,
+      y: 0
+    });
   };
 
   // Helper function to format large numbers
@@ -267,8 +284,8 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </div>
 
         {/* Charts Grid */}
-        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 lg:gap-8">
-          {config.map((metric) => {
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 xl:gap-8">
+          {config.filter(metric => metric.is_active !== false).map((metric) => {
             // For daily period, use average_values (actual values) and compare against goal
             // For other periods, use goalReached (days completed) and compare against total days
             let completed, total;
@@ -280,10 +297,40 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
             } else {
               completed = currentPeriodData?.goalReached?.[metric.key] || 0;
               total = totalDays;
+              
+              // For limit type metrics, recalculate completed based on actual daily data
+              if (metric.type === 'max') {
+                const now = new Date();
+                let daysPassed = 0;
+                
+                if (selectedPeriod === 'weekly') {
+                  // Get the day of the week (0 = Sunday, 1 = Monday, etc.)
+                  // Convert to Monday = 0, Tuesday = 1, ..., Sunday = 6
+                  const dayOfWeek = (now.getDay() + 6) % 7;
+                  daysPassed = dayOfWeek + 1; // Include today
+                } else if (selectedPeriod === 'monthly') {
+                  daysPassed = Math.min(now.getDate(), totalDays);
+                } else if (selectedPeriod === 'yearly') {
+                  const startOfYear = new Date(now.getFullYear(), 0, 1);
+                  const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+                  daysPassed = Math.min(dayOfYear, totalDays);
+                }
+                
+                // Count only the days that have passed and are under the limit
+                const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
+                const goal = metric.goal || 0;
+                completed = 0;
+                
+                for (let i = 0; i < Math.min(daysPassed, dailyTotals.length); i++) {
+                  if (dailyTotals[i] <= goal) {
+                    completed++;
+                  }
+                }
+              }
             }
             
             return (
-              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[200px] min-w-[180px]">
+              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-3 sm:p-4 lg:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[140px] sm:max-w-[150px] lg:max-w-[180px] min-w-[130px] sm:min-w-[140px] lg:min-w-[160px]">
                 {/* Plus button in top right corner */}
                 <button
                   onClick={() => handleAddMetric(metric)}
@@ -297,11 +344,11 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                   completed={completed}
                   total={total}
                   metricName={metric.name}
-                  size={120}
+                  size={chartSize}
                   showRawValues={selectedPeriod === 'daily'}
                   metricType={metric.type}
                 />
-                <div className="mt-3 sm:mt-4 text-center">
+                <div className="mt-2 sm:mt-3 lg:mt-4 text-center">
                   <div className="flex items-center justify-center space-x-1 sm:space-x-2">
                     <p className="text-xs text-gray-500">
                       {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{metric.goal || 'Not set'}</span> {metric.unit}
@@ -334,7 +381,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <div className="flex justify-center">
                   <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 text-xs text-gray-500 font-medium">
                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                      <div key={day} className="w-7 sm:w-9 lg:w-11 xl:w-12 text-center">
+                      <div key={day} className="w-6 sm:w-8 lg:w-11 xl:w-12 text-center">
                         {day}
                       </div>
                     ))}
@@ -345,7 +392,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <div className="space-y-4 sm:space-y-6">
                   {/* Top Row - Water, Calories, Sleep */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 justify-items-center">
-                    {config.filter(metric => ['water_litres', 'calories_kcal', 'sleep_hours'].includes(metric.key)).map((metric) => {
+                    {config.filter(metric => ['water_litres', 'calories_kcal', 'sleep_hours'].includes(metric.key) && metric.is_active !== false).map((metric) => {
                       const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
                       const goal = metric.goal || 0;
                       
@@ -362,7 +409,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                               return (
                                 <div
                                   key={dayIndex}
-                                  className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
+                                  className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
                                     isGoalMet 
                                       ? 'bg-green-500 text-white shadow-sm border-green-200' 
                                       : 'bg-red-100 text-red-700 border-red-200'
@@ -377,10 +424,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                                   onMouseLeave={handleTooltipHide}
                                 >
                                   <span className={`font-medium ${
-                                    formattedValue.length >= 4 ? 'text-[8px] sm:text-[10px] lg:text-xs' :
-                                    formattedValue.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
-                                    formattedValue.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
-                                    'text-xs sm:text-sm lg:text-base'
+                                    formattedValue.length >= 4 ? 'text-[7px] sm:text-[9px] lg:text-xs' :
+                                    formattedValue.length === 3 ? 'text-[9px] sm:text-[11px] lg:text-sm' : 
+                                    formattedValue.length === 2 ? 'text-[10px] sm:text-xs lg:text-base' : 
+                                    'text-[10px] sm:text-xs lg:text-base'
                                   }`}>
                                     {formattedValue}
                                   </span>
@@ -398,7 +445,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
 
                   {/* Bottom Row - Productivity, Exercise, Spends */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 justify-items-center">
-                    {config.filter(metric => ['productivity_hours', 'exercise_hours', 'spend_rupees'].includes(metric.key)).map((metric) => {
+                    {config.filter(metric => ['productivity_hours', 'exercise_hours', 'spend_rupees'].includes(metric.key) && metric.is_active !== false).map((metric) => {
                       const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
                       const goal = metric.goal || 0;
                       
@@ -415,7 +462,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                               return (
                                 <div
                                   key={dayIndex}
-                                  className={`w-7 h-7 sm:w-9 sm:h-9 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
+                                  className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-11 lg:h-11 xl:w-12 xl:h-12 rounded border flex items-center justify-center font-medium cursor-help ${
                                     isGoalMet 
                                       ? 'bg-green-500 text-white shadow-sm border-green-200' 
                                       : 'bg-red-100 text-red-700 border-red-200'
@@ -430,10 +477,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                                   onMouseLeave={handleTooltipHide}
                                 >
                                   <span className={`font-medium ${
-                                    formattedValue.length >= 4 ? 'text-[8px] sm:text-[10px] lg:text-xs' :
-                                    formattedValue.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
-                                    formattedValue.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
-                                    'text-xs sm:text-sm lg:text-base'
+                                    formattedValue.length >= 4 ? 'text-[7px] sm:text-[9px] lg:text-xs' :
+                                    formattedValue.length === 3 ? 'text-[9px] sm:text-[11px] lg:text-sm' : 
+                                    formattedValue.length === 2 ? 'text-[10px] sm:text-xs lg:text-base' : 
+                                    'text-[10px] sm:text-xs lg:text-base'
                                   }`}>
                                     {formattedValue}
                                   </span>
@@ -442,7 +489,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                             })}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Weekly avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
+                            Avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
                           </div>
                         </div>
                       );
@@ -453,7 +500,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
             ) : (
               /* Monthly/Yearly Average Values Grid */
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
-                {config.map((metric) => {
+                {config.filter(metric => metric.is_active !== false).map((metric) => {
                   const average = currentPeriodData?.average_values?.[metric.key] || 0;
                   const goal = metric.goal || 0;
                   const isGoalMet = metric.type === 'max' ? average <= goal : average >= goal;
@@ -477,7 +524,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Weekly avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
+                        Avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
                       </div>
                     </div>
                   );
