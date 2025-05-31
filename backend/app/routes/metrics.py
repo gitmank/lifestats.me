@@ -2,13 +2,20 @@ from typing import List
 from datetime import datetime, timedelta
 import logging
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from app.config import config
-from app.schemas import MetricConfig, MetricEntryCreate, MetricEntryRead, AggregatedMetrics
-from app.crud import create_metric_entry, get_user_metrics, get_user_goals, get_last_entries, delete_metric_entry
+from app.schemas import (
+    MetricConfig, MetricEntryCreate, MetricEntryRead, AggregatedMetrics,
+    UserMetricsConfigCreate, UserMetricsConfigUpdate, UserMetricsConfigRead
+)
+from app.crud import (
+    create_metric_entry, get_user_metrics, get_user_goals, get_last_entries, 
+    delete_metric_entry, get_user_metrics_config_active, get_user_metrics_config,
+    create_user_metrics_config, update_user_metrics_config, delete_user_metrics_config
+)
 from app.db import get_session
 from app.auth import get_current_user
 from app.models import User
@@ -22,24 +29,97 @@ def get_metrics_config(
     session: Session = Depends(get_session),
     _rl: None = Depends(rate_limit_user),
 ):
+    """Get user-specific metrics configuration."""
     logging.info(f"get_metrics_config endpoint called for user_id={current_user.id}")
     
-    # Get base configuration
-    base_config = config.get_metrics()
+    # Get user's specific configuration
+    user_configs = get_user_metrics_config_active(session, current_user.id)
     
-    # Get user's custom goals
-    user_goals = get_user_goals(session, current_user.id)
-    goal_map = {goal.metric_key: goal.target_value for goal in user_goals}
-    
-    # Merge user goals with base config
+    # Convert to MetricConfig format for compatibility
     result = []
-    for metric in base_config:
-        metric_dict = metric.copy()
-        # Use user's custom goal if available, otherwise use default_goal
-        metric_dict["goal"] = goal_map.get(metric["key"], metric.get("default_goal", 0))
+    for config in user_configs:
+        metric_dict = {
+            "key": config.metric_key,
+            "name": config.metric_name,
+            "unit": config.unit,
+            "type": config.type,
+            "default_goal": config.default_goal,
+            "goal": config.goal,
+            "is_active": config.is_active
+        }
         result.append(metric_dict)
     
     return result
+
+@router.post("/config", response_model=UserMetricsConfigRead)
+def create_metrics_config(
+    config_in: UserMetricsConfigCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """Create a new metrics configuration for the user."""
+    logging.info(f"create_metrics_config called for user_id={current_user.id}, payload={config_in.model_dump()}")
+    
+    # Check if metric already exists for this user
+    existing_configs = get_user_metrics_config(session, current_user.id)
+    for config in existing_configs:
+        if config.metric_key == config_in.metric_key:
+            raise HTTPException(status_code=400, detail=f"Metric '{config_in.metric_key}' already exists for user")
+    
+    new_config = create_user_metrics_config(
+        session=session,
+        user_id=current_user.id,
+        metric_key=config_in.metric_key,
+        metric_name=config_in.metric_name,
+        unit=config_in.unit,
+        type=config_in.type,
+        goal=config_in.goal,
+        default_goal=config_in.default_goal,
+        is_active=config_in.is_active
+    )
+    
+    return new_config
+
+@router.put("/config/{metric_key}", response_model=UserMetricsConfigRead)
+def update_metrics_config(
+    metric_key: str,
+    config_in: UserMetricsConfigUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """Update a metrics configuration for the user."""
+    logging.info(f"update_metrics_config called for user_id={current_user.id}, metric_key={metric_key}")
+    
+    updated_config = update_user_metrics_config(
+        session=session,
+        user_id=current_user.id,
+        metric_key=metric_key,
+        **config_in.model_dump(exclude_unset=True)
+    )
+    
+    if not updated_config:
+        raise HTTPException(status_code=404, detail=f"Metric '{metric_key}' not found for user")
+    
+    return updated_config
+
+@router.delete("/config/{metric_key}")
+def delete_metrics_config(
+    metric_key: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+    _rl: None = Depends(rate_limit_user),
+):
+    """Delete (deactivate) a metrics configuration for the user."""
+    logging.info(f"delete_metrics_config called for user_id={current_user.id}, metric_key={metric_key}")
+    
+    success = delete_user_metrics_config(session, current_user.id, metric_key)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Metric '{metric_key}' not found for user")
+    
+    return {"status": "success", "message": f"Metric '{metric_key}' deactivated"}
 
 @router.get("", response_model=AggregatedMetrics)
 def read_metrics(
@@ -50,6 +130,7 @@ def read_metrics(
 ):
     """
     Return aggregated metric sums for the authenticated user over fixed periods.
+    Uses user-specific metrics configuration.
     """
     logging.info(f"read_metrics called for user_id={current_user.id}")
     now = datetime.utcnow()
@@ -74,18 +155,15 @@ def read_metrics(
         "yearly": now - timedelta(days=365),
     }
     
-    # Determine all available metric keys from config
-    metric_keys = [m["key"] for m in config.get_metrics()]
-    # Build baseline goals from config defaults, then override with user-set goals
-    default_goal_map = {m["key"]: m.get("default_goal") for m in config.get_metrics() if m.get("default_goal") is not None}
-    # Build type map for goal comparison logic
-    type_map = {m["key"]: m.get("type", "min") for m in config.get_metrics()}
-    goals = get_user_goals(session, current_user.id)
-    goal_map = default_goal_map.copy()
-    for g in sorted(goals, key=lambda x: x.created_at):
-        goal_map[g.metric_key] = g.target_value
+    # Get user's active metrics configuration
+    user_configs = get_user_metrics_config_active(session, current_user.id)
+    metric_keys = [config.metric_key for config in user_configs]
+    goal_map = {config.metric_key: config.goal for config in user_configs if config.goal is not None}
+    type_map = {config.metric_key: config.type for config in user_configs}
+    
     # Prepare containers for aggregated metrics
     aggregated: dict = {}
+    
     # Define period lengths in days for averaging per day
     period_days = {
         "daily": 1,
@@ -94,6 +172,7 @@ def read_metrics(
         "quarterly": 90,
         "yearly": 365,
     }
+    
     # Compute aggregated metrics per period
     for name, start in periods.items():
         # Fetch entries in the period
@@ -103,12 +182,14 @@ def read_metrics(
         else:
             # For other periods: use start to now
             entries = get_user_metrics(session, current_user.id, start, now)
+        
         # Sum values for each metric key
         sums: dict = {key: 0.0 for key in metric_keys}
         for entry in entries:
             key = entry.metric_key
             if key in sums:
                 sums[key] += entry.value
+        
         # Compute average per day by dividing sum by number of days in period
         days = period_days.get(name, 1)
         avg_per_day: dict = {}
@@ -143,7 +224,12 @@ def read_metrics(
         
         # Count goal-reached days for this period using the same dates
         goal_counts = {}
-        for key, target in goal_map.items():
+        for key in metric_keys:
+            target = goal_map.get(key)
+            if target is None:
+                goal_counts[key] = 0
+                continue
+                
             count = 0
             metric_type = type_map.get(key, "min")
             for day in dates:
@@ -163,6 +249,7 @@ def read_metrics(
             goal_counts[key] = count
         base["goalReached"] = goal_counts
         aggregated[name] = base
+    
     # Return aggregated metrics with nested goalReached per period
     return aggregated
 
@@ -176,19 +263,23 @@ def add_metric_entry(
 ):
     """
     Create a new metric entry for the authenticated user.
+    Validates against user's active metrics configuration.
     """
     logging.info(f"add_metric_entry called for user_id={current_user.id}, payload={entry_in.model_dump()}")
-    # Validate metric_key against configured metrics
-    valid_keys = [m["key"] for m in config.get_metrics()]
+    
+    # Validate metric_key against user's active metrics configuration
+    user_configs = get_user_metrics_config_active(session, current_user.id)
+    valid_keys = [config.metric_key for config in user_configs]
+    
     if entry_in.metric_key not in valid_keys:
         # Return 400 Bad Request with hint of valid metric keys
         content = {
-            "detail": f"Invalid metric_key '{entry_in.metric_key}'",
+            "detail": f"Invalid metric_key '{entry_in.metric_key}' or metric is not active for user",
             "hint": valid_keys,
         }
         return JSONResponse(status_code=400, content=content)
+    
     # Determine timestamp: use provided or default to current UTC time
-    from datetime import datetime
     ts = entry_in.timestamp or datetime.utcnow()
     entry = create_metric_entry(
         session,

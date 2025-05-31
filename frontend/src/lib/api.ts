@@ -38,8 +38,41 @@ export interface MetricConfig {
   name: string;
   unit: string;
   type: string; // "min" or "max"
-  default_goal: number;
-  goal: number;
+  default_goal?: number;
+  goal?: number;
+  is_active?: boolean;
+}
+
+export interface UserMetricsConfig {
+  id: number;
+  user_id: number;
+  metric_key: string;
+  metric_name: string;
+  unit: string;
+  type: string;
+  goal?: number;
+  default_goal?: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserMetricsConfigCreate {
+  metric_key: string;
+  metric_name: string;
+  unit: string;
+  type: string;
+  goal?: number;
+  default_goal?: number;
+  is_active?: boolean;
+}
+
+export interface UserMetricsConfigUpdate {
+  metric_name?: string;
+  unit?: string;
+  type?: string;
+  goal?: number;
+  is_active?: boolean;
 }
 
 export interface GoalReached {
@@ -124,6 +157,20 @@ export const apiClient = {
   async getMetricsConfig(): Promise<MetricConfig[]> {
     const response = await api.get('/api/metrics/config');
     return response.data;
+  },
+
+  async createMetricsConfig(config: UserMetricsConfigCreate): Promise<UserMetricsConfig> {
+    const response = await api.post('/api/metrics/config', config);
+    return response.data;
+  },
+
+  async updateMetricsConfig(metricKey: string, updates: UserMetricsConfigUpdate): Promise<UserMetricsConfig> {
+    const response = await api.put(`/api/metrics/config/${metricKey}`, updates);
+    return response.data;
+  },
+
+  async deleteMetricsConfig(metricKey: string): Promise<void> {
+    await api.delete(`/api/metrics/config/${metricKey}`);
   },
 
   async getMetrics(): Promise<AggregatedMetrics> {

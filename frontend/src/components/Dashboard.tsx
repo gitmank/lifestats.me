@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Settings, TrendingUp, Edit2, Plus, Info } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Settings, TrendingUp, Edit2, Plus } from 'lucide-react';
 import GoalCompletionChart from './GoalCompletionChart';
 import PeriodSelector from './PeriodSelector';
 import GoalEditModal from './GoalEditModal';
@@ -21,12 +21,54 @@ const periodDays = {
   yearly: 365,
 };
 
-export default function Dashboard({ username, onLogout }: DashboardProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
+// Custom hook for shared data management
+const useSharedData = () => {
   const [metrics, setMetrics] = useState<AggregatedMetrics | null>(null);
   const [config, setConfig] = useState<MetricConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [metricsData, configData] = await Promise.all([
+        apiClient.getMetrics(),
+        apiClient.getMetricsConfig(),
+      ]);
+
+      setMetrics(metricsData);
+      setConfig(configData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshKey]);
+
+  const refreshData = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return {
+    metrics,
+    config,
+    loading,
+    error,
+    setConfig, // For local updates
+    refreshData, // For triggering background refresh
+    fetchData // For immediate refresh
+  };
+};
+
+export default function Dashboard({ username, onLogout }: DashboardProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [editingGoal, setEditingGoal] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [addingMetric, setAddingMetric] = useState<{ metric: MetricConfig; isOpen: boolean } | null>(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -36,6 +78,9 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
     x: 0,
     y: 0
   });
+
+  // Use the shared data hook
+  const { metrics, config, loading, error, setConfig, refreshData, fetchData } = useSharedData();
 
   const handleEditGoal = (metric: MetricConfig) => {
     setEditingGoal({ metric, isOpen: true });
@@ -96,28 +141,15 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
     setTooltip({ show: false, content: '', x: 0, y: 0 });
   };
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const [metricsData, configData] = await Promise.all([
-        apiClient.getMetrics(),
-        apiClient.getMetricsConfig(),
-      ]);
-
-      setMetrics(metricsData);
-      setConfig(configData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  // Helper function to format large numbers
+  const formatNumber = (value: number) => {
+    const rounded = Math.round(value);
+    if (rounded >= 1000) {
+      const k = rounded / 1000;
+      return `${k.toFixed(1)}k`;
     }
+    return rounded.toString();
   };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   if (showProfile) {
     return (
@@ -125,6 +157,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         username={username}
         onBack={() => setShowProfile(false)}
         onLogout={onLogout}
+        onDataChange={refreshData} // Pass the refresh function to Profile
       />
     );
   }
@@ -234,7 +267,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </div>
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6 lg:gap-8 justify-items-center">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 lg:gap-8">
           {config.map((metric) => {
             // For daily period, use average_values (actual values) and compare against goal
             // For other periods, use goalReached (days completed) and compare against total days
@@ -250,7 +283,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
             }
             
             return (
-              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[200px]">
+              <div key={metric.key} className="bg-white rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow relative w-full max-w-[200px] min-w-[180px]">
                 {/* Plus button in top right corner */}
                 <button
                   onClick={() => handleAddMetric(metric)}
@@ -311,10 +344,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 {/* Metrics Grid - Custom Two-Row Layout */}
                 <div className="space-y-4 sm:space-y-6">
                   {/* Top Row - Water, Calories, Sleep */}
-                  <div className="grid grid-cols-3 gap-4 sm:gap-6 justify-items-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 justify-items-center">
                     {config.filter(metric => ['water_litres', 'calories_kcal', 'sleep_hours'].includes(metric.key)).map((metric) => {
                       const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
-                      const goal = metric.goal;
+                      const goal = metric.goal || 0;
                       
                       return (
                         <div key={metric.key} className="text-center">
@@ -324,9 +357,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                           <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-2 justify-items-center">
                             {dailyTotals.map((value: number, dayIndex: number) => {
                               const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
-                              const roundedValue = Math.round(value);
-                              const valueStr = roundedValue.toString();
-                              const hasLargeNumber = valueStr.length > 3;
+                              const formattedValue = formatNumber(value);
                               
                               return (
                                 <div
@@ -345,17 +376,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                                   onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
                                   onMouseLeave={handleTooltipHide}
                                 >
-                                  {hasLargeNumber ? (
-                                    <Info className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
-                                  ) : (
-                                    <span className={`font-medium ${
-                                      valueStr.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
-                                      valueStr.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
-                                      'text-xs sm:text-sm lg:text-base'
-                                    }`}>
-                                      {roundedValue}
-                                    </span>
-                                  )}
+                                  <span className={`font-medium ${
+                                    formattedValue.length >= 4 ? 'text-[8px] sm:text-[10px] lg:text-xs' :
+                                    formattedValue.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
+                                    formattedValue.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
+                                    'text-xs sm:text-sm lg:text-base'
+                                  }`}>
+                                    {formattedValue}
+                                  </span>
                                 </div>
                               );
                             })}
@@ -369,10 +397,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                   </div>
 
                   {/* Bottom Row - Productivity, Exercise, Spends */}
-                  <div className="grid grid-cols-3 gap-4 sm:gap-6 justify-items-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 justify-items-center">
                     {config.filter(metric => ['productivity_hours', 'exercise_hours', 'spend_rupees'].includes(metric.key)).map((metric) => {
                       const dailyTotals = currentPeriodData?.daily_totals?.[metric.key] || [];
-                      const goal = metric.goal;
+                      const goal = metric.goal || 0;
                       
                       return (
                         <div key={metric.key} className="text-center">
@@ -382,9 +410,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                           <div className="grid grid-cols-7 gap-1 sm:gap-2 lg:gap-3 mb-2 justify-items-center">
                             {dailyTotals.map((value: number, dayIndex: number) => {
                               const isGoalMet = metric.type === 'max' ? value <= goal : value >= goal;
-                              const roundedValue = Math.round(value);
-                              const valueStr = roundedValue.toString();
-                              const hasLargeNumber = valueStr.length > 3;
+                              const formattedValue = formatNumber(value);
                               
                               return (
                                 <div
@@ -403,17 +429,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                                   onMouseEnter={(e) => handleTooltipShow(e, `Day ${dayIndex + 1}: ${value} ${metric.unit} (${metric.type === 'max' ? 'Limit' : 'Goal'}: ${goal})`)}
                                   onMouseLeave={handleTooltipHide}
                                 >
-                                  {hasLargeNumber ? (
-                                    <Info className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
-                                  ) : (
-                                    <span className={`font-medium ${
-                                      valueStr.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
-                                      valueStr.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
-                                      'text-xs sm:text-sm lg:text-base'
-                                    }`}>
-                                      {roundedValue}
-                                    </span>
-                                  )}
+                                  <span className={`font-medium ${
+                                    formattedValue.length >= 4 ? 'text-[8px] sm:text-[10px] lg:text-xs' :
+                                    formattedValue.length === 3 ? 'text-[10px] sm:text-xs lg:text-sm' : 
+                                    formattedValue.length === 2 ? 'text-xs sm:text-sm lg:text-base' : 
+                                    'text-xs sm:text-sm lg:text-base'
+                                  }`}>
+                                    {formattedValue}
+                                  </span>
                                 </div>
                               );
                             })}
@@ -432,7 +455,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
                 {config.map((metric) => {
                   const average = currentPeriodData?.average_values?.[metric.key] || 0;
-                  const goal = metric.goal;
+                  const goal = metric.goal || 0;
                   const isGoalMet = metric.type === 'max' ? average <= goal : average >= goal;
                   
                   return (

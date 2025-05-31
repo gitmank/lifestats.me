@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Session, select
-from .models import User, MetricEntry, APIKey, Goal
+from .models import User, MetricEntry, APIKey, Goal, UserMetricsConfig
 from .config import config
 import logging
 
@@ -14,8 +14,34 @@ def create_user(session: Session, username: str) -> User:
     session.add(user)
     session.commit()
     session.refresh(user)
-    return user
     
+    # Initialize user with default metrics configuration
+    initialize_user_metrics_config(session, user.id)
+    
+    return user
+
+def initialize_user_metrics_config(session: Session, user_id: int) -> None:
+    """
+    Initialize a user's metrics configuration with default values from the global config.
+    """
+    logging.info(f"initialize_user_metrics_config called for user_id={user_id}")
+    
+    default_metrics = config.get_metrics()
+    for metric in default_metrics:
+        user_config = UserMetricsConfig(
+            user_id=user_id,
+            metric_key=metric["key"],
+            metric_name=metric["name"],
+            unit=metric["unit"],
+            type=metric["type"],
+            goal=metric.get("goal"),
+            default_goal=metric.get("default_goal"),
+            is_active=True
+        )
+        session.add(user_config)
+    
+    session.commit()
+
 def create_api_key(session: Session, user_id: int, key_hash: str) -> APIKey:
     """
     Create a new API key for the given user.
@@ -64,7 +90,7 @@ def get_user_api_keys(session: Session, user_id: int) -> List[APIKey]:
 
 def delete_user(session: Session, user_id: int) -> None:
     """
-    Delete a user and all associated data (API keys, metrics, goals).
+    Delete a user and all associated data (API keys, metrics, goals, metrics config).
     """
     logging.info(f"delete_user called for user_id={user_id}")
     
@@ -85,6 +111,12 @@ def delete_user(session: Session, user_id: int) -> None:
     goals = session.exec(statement).all()
     for goal in goals:
         session.delete(goal)
+    
+    # Delete all user metrics config
+    statement = select(UserMetricsConfig).where(UserMetricsConfig.user_id == user_id)
+    metrics_configs = session.exec(statement).all()
+    for config in metrics_configs:
+        session.delete(config)
     
     # Delete the user
     statement = select(User).where(User.id == user_id)
@@ -224,3 +256,105 @@ def delete_metric_entry(session: Session, user_id: int, entry_id: int) -> None:
     if entry:
         session.delete(entry)
         session.commit()
+
+def get_user_metrics_config(session: Session, user_id: int) -> List[UserMetricsConfig]:
+    """
+    Get all metrics configurations for a user.
+    """
+    logging.info(f"get_user_metrics_config called for user_id={user_id}")
+    statement = select(UserMetricsConfig).where(UserMetricsConfig.user_id == user_id)
+    return session.exec(statement).all()
+
+def get_user_metrics_config_active(session: Session, user_id: int) -> List[UserMetricsConfig]:
+    """
+    Get only active metrics configurations for a user.
+    """
+    logging.info(f"get_user_metrics_config_active called for user_id={user_id}")
+    statement = select(UserMetricsConfig).where(
+        UserMetricsConfig.user_id == user_id,
+        UserMetricsConfig.is_active == True
+    )
+    return session.exec(statement).all()
+
+def create_user_metrics_config(
+    session: Session, 
+    user_id: int, 
+    metric_key: str,
+    metric_name: str,
+    unit: str,
+    type: str,
+    goal: Optional[float] = None,
+    default_goal: Optional[float] = None,
+    is_active: bool = True
+) -> UserMetricsConfig:
+    """
+    Create a new metrics configuration for a user.
+    """
+    logging.info(f"create_user_metrics_config called for user_id={user_id}, metric_key={metric_key}")
+    
+    config = UserMetricsConfig(
+        user_id=user_id,
+        metric_key=metric_key,
+        metric_name=metric_name,
+        unit=unit,
+        type=type,
+        goal=goal,
+        default_goal=default_goal,
+        is_active=is_active,
+        updated_at=datetime.utcnow()
+    )
+    session.add(config)
+    session.commit()
+    session.refresh(config)
+    return config
+
+def update_user_metrics_config(
+    session: Session,
+    user_id: int,
+    metric_key: str,
+    **kwargs
+) -> Optional[UserMetricsConfig]:
+    """
+    Update a user's metrics configuration.
+    """
+    logging.info(f"update_user_metrics_config called for user_id={user_id}, metric_key={metric_key}")
+    
+    statement = select(UserMetricsConfig).where(
+        UserMetricsConfig.user_id == user_id,
+        UserMetricsConfig.metric_key == metric_key
+    )
+    config = session.exec(statement).first()
+    
+    if config:
+        for key, value in kwargs.items():
+            if hasattr(config, key) and value is not None:
+                setattr(config, key, value)
+        
+        config.updated_at = datetime.utcnow()
+        session.add(config)
+        session.commit()
+        session.refresh(config)
+    
+    return config
+
+def delete_user_metrics_config(session: Session, user_id: int, metric_key: str) -> bool:
+    """
+    Delete (or deactivate) a user's metrics configuration.
+    """
+    logging.info(f"delete_user_metrics_config called for user_id={user_id}, metric_key={metric_key}")
+    
+    statement = select(UserMetricsConfig).where(
+        UserMetricsConfig.user_id == user_id,
+        UserMetricsConfig.metric_key == metric_key
+    )
+    config = session.exec(statement).first()
+    
+    if config:
+        # Instead of deleting, we deactivate to preserve history
+        config.is_active = False
+        config.updated_at = datetime.utcnow()
+        session.add(config)
+        session.commit()
+        return True
+    
+    return False

@@ -1,6 +1,7 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from sqlmodel import SQLModel
+from pydantic import BaseModel
 
 class UserBase(SQLModel):
     username: str
@@ -25,6 +26,36 @@ class MetricConfig(SQLModel):
     # Optional default goal value for this metric (from config)
     default_goal: Optional[float] = None
     goal: Optional[float] = None
+    is_active: Optional[bool] = True
+
+class UserMetricsConfigBase(SQLModel):
+    """Base schema for user metrics configuration."""
+    metric_key: str
+    metric_name: str
+    unit: str
+    type: str  # "min" or "max"
+    goal: Optional[float] = None
+    default_goal: Optional[float] = None
+    is_active: bool = True
+
+class UserMetricsConfigCreate(UserMetricsConfigBase):
+    """Schema for creating a new user metrics configuration."""
+    pass
+
+class UserMetricsConfigUpdate(SQLModel):
+    """Schema for updating user metrics configuration."""
+    metric_name: Optional[str] = None
+    unit: Optional[str] = None
+    type: Optional[str] = None
+    goal: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class UserMetricsConfigRead(UserMetricsConfigBase):
+    """Schema for reading user metrics configuration."""
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
 
 class MetricEntryBase(SQLModel):
     metric_key: str
