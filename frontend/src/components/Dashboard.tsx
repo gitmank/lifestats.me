@@ -389,7 +389,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                             })}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                            Avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
                           </div>
                         </div>
                       );
@@ -442,7 +442,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                             })}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                            Weekly avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
                           </div>
                         </div>
                       );
@@ -477,7 +477,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                         </div>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{goal || 'Not set'}</span> {metric.unit}
+                        Weekly avg: <span className="font-bold text-gray-700">{(currentPeriodData?.average_values?.[metric.key] || 0).toFixed(1)}</span> {metric.unit}
                       </div>
                     </div>
                   );
