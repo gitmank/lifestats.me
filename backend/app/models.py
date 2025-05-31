@@ -63,8 +63,8 @@ class UserMetricsConfig(SQLModel, table=True):
         Index("ix_user_metrics_config_is_active", "is_active"),
     )
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    metric_key: str = Field(index=True)
+    user_id: int = Field(foreign_key="user.id")
+    metric_key: str
     metric_name: str
     unit: str
     type: str = Field(description="min or max")  # "min" or "max"
