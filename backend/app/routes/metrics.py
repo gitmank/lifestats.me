@@ -219,8 +219,23 @@ def read_metrics(
             if key in sums:
                 sums[key] += entry.value
         
+        # --- MODIFIED: Only count days that have passed (including today) for average calculation ---
+        if name == "weekly":
+            # Days passed in current week (Monday=0, ..., today)
+            days_passed = today.weekday() + 1  # e.g. if today is Wednesday (2), days_passed = 3
+        elif name == "monthly":
+            days_passed = today.day  # 1-based (e.g. 7th = 7 days passed)
+        elif name == "quarterly":
+            # Approximate: 90 days, so use days since (now - 90 days) to today
+            days_passed = (now.date() - (now - timedelta(days=90)).date()).days + 1
+        elif name == "yearly":
+            days_passed = (now.date() - (now - timedelta(days=365)).date()).days + 1
+        else:
+            days_passed = 1
+        # Cap days_passed to max period length
+        days = min(period_days.get(name, 1), days_passed)
+        
         # Compute average per day by dividing sum by number of days in period
-        days = period_days.get(name, 1)
         avg_per_day: dict = {}
         for key in metric_keys:
             total = sums.get(key, 0.0)
