@@ -353,13 +353,13 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                     <p className="text-xs text-gray-500">
                       {metric.type === 'max' ? 'Limit' : 'Goal'}: <span className="font-bold text-gray-700">{metric.goal || 'Not set'}</span> {metric.unit}
                     </p>
-                    {/* <button
+                    <button
                       onClick={() => handleEditGoal(metric)}
-                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      className="hidden p-1 hover:bg-gray-100 rounded-full transition-colors"
                       title={`Edit ${metric.type === 'max' ? 'limit' : 'goal'}`}
                     >
                       <Edit2 className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                    </button> */}
+                    </button>
                   </div>
                 </div>
               </div>
